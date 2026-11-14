@@ -59,6 +59,7 @@ impl Canvas {
         self.data.fill(0);
     }
 
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.data.iter().all(|&v| v == 0)
     }

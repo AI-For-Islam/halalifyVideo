@@ -61,13 +61,6 @@ pub struct MediaInfo {
     pub audio: Option<AudioStream>,
 }
 
-impl MediaInfo {
-    /// Frames the normalised video will have, for progress reporting only.
-    pub fn estimated_frames(&self) -> u64 {
-        self.video.as_ref().map_or(0, |v| (self.duration * v.fps.as_f64()).round() as u64)
-    }
-}
-
 #[derive(Deserialize)]
 struct RawProbe {
     #[serde(default)]
