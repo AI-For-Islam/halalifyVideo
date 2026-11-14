@@ -1,0 +1,35 @@
+[package]
+name = "halalify"
+version = "0.1.0"
+edition = "2024"
+description = "Removes music from videos and blurs the people you choose, locally on your GPU"
+license = "MIT"
+rust-version = "1.92"
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive"] }
+dirs = "7.0.0"
+fast_image_resize = { version = "6.1.0", features = ["rayon"] }
+half = "2.7.1"
+indicatif = "0.18.6"
+ndarray = "0.17"
+ort = { version = "=2.0.0-rc.15", features = ["cuda", "directml", "half"] }
+rayon = "1.12.0"
+realfft = "3.5.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+ureq = "3"
+
+[profile.release]
+lto = "thin"
+strip = true
+
+# Pixel loops and DSP are unusably slow unoptimised, so even debug builds and
+# tests optimise this crate a little and its dependencies fully.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

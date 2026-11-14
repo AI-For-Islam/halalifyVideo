@@ -1,0 +1,16 @@
+/target
+/.halalify
+/models
+/work
+/samples
+/tools/.venv
+__pycache__/
+*.onnx
+*.onnx.data
+*.ckpt
+*.chpt
+*.mp4
+*.mkv
+*.webm
+*.wav
+*.log
