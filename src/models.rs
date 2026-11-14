@@ -130,15 +130,16 @@ pub const MDX_KIM_VOCAL_2: Model = Model {
     about: "MDX-Net vocals: keeps voices, removes instruments",
 };
 
-/// RF-DETR-Seg Small (Roboflow): finds people and their outlines in one pass.
-/// ONNX export hosted by the `usls` project.
-pub const RFDETR_SEG_S: Model = Model {
-    file: "rfdetr-seg-small-fp16.onnx",
-    url: "https://github.com/jamjamjon/assets/releases/download/rfdetr/seg-small-fp16.onnx",
-    sha256: "c7d3bc18bec5d886557515afd543de32f016b3720c2bca7458402529a69001b1",
-    bytes: 61_897_886,
-    license: "Apache-2.0 (Roboflow RF-DETR)",
-    about: "RF-DETR-Seg S: person detection with instance masks",
+/// YOLO26s-seg (Ultralytics): finds people and their outlines in one pass,
+/// with no non-maximum suppression step. ONNX export (fp16 weights, float32
+/// inputs and outputs, dynamic size) hosted by the `usls` project.
+pub const YOLO26S_SEG: Model = Model {
+    file: "yolo26s-seg-fp16.onnx",
+    url: "https://github.com/jamjamjon/assets/releases/download/yolo/v26-s-seg-fp16.onnx",
+    sha256: "dba035e75fa52c53f20a9fd44d49122bb32fe1d278ac87bcdab0dfafff187a12",
+    bytes: 21_014_540,
+    license: "AGPL-3.0 (Ultralytics YOLO26)",
+    about: "YOLO26s-seg: person detection with instance masks",
 };
 
 /// SigLIP 2 base image encoder (Google), used zero-shot to tell who a detected
@@ -152,4 +153,4 @@ pub const SIGLIP2_VISION: Model = Model {
     about: "SigLIP 2 B/16-256 image encoder: zero-shot person classification",
 };
 
-pub const ALL: &[Model] = &[MDX_KIM_VOCAL_2, RFDETR_SEG_S, SIGLIP2_VISION];
+pub const ALL: &[Model] = &[MDX_KIM_VOCAL_2, YOLO26S_SEG, SIGLIP2_VISION];
