@@ -50,7 +50,22 @@ too. `--threshold` moves that line. **It can still miss someone, so review the
 result before relying on it.** See [docs/DESIGN.md](docs/DESIGN.md) for the
 details and the known limits.
 
-## Set up (Windows)
+## Download
+
+Ready-to-run archives for **Windows** and **Linux** (64-bit) are built by
+`scripts/package.sh` and published on the releases page once the repository
+is on GitHub. Unpack one, then:
+
+- **Windows:** drag a video onto `HalalifyVid.cmd`, or double-click it and
+  paste a file path or a YouTube link.
+- **Linux:** `./halalifyvid.sh video.mp4`
+
+The first run installs the runtime and models into the folder's `data`
+directory. You also need ffmpeg (and yt-dlp for links).
+[docs/RELEASES.md](docs/RELEASES.md) covers requirements, what gets
+installed, and how to build the archives yourself.
+
+## Build from source (Windows)
 
 You need [Rust](https://rustup.rs), ffmpeg and, for links, yt-dlp:
 
@@ -68,8 +83,9 @@ target\release\halalify setup
 `setup` downloads ONNX Runtime 1.21 and its GPU libraries, each pinned to a
 version and verified by SHA-256: about 1.5 GB for an NVIDIA GPU (CUDA), about
 220 MB for any other DirectX 12 GPU (DirectML). The three models (275 MB)
-follow. Everything goes into `%LOCALAPPDATA%\HalalifyVid`, or into the folder
-named by `HALALIFY_HOME`.
+follow. Everything goes into `%LOCALAPPDATA%\HalalifyVid` (`~/.local/share/HalalifyVid`
+on Linux), the folder named by `HALALIFY_HOME`, or a `data` folder next to
+the program when there is one.
 
 Check what was found at any time:
 

@@ -205,7 +205,7 @@ stereo chunks per call.
   also removes non-musical sound such as applause.
 - **Variable-frame-rate sources** are converted to a constant rate.
 - **HDR** sources are written as 8-bit SDR without tone mapping.
-- **Windows x64** is the tested platform; `setup` only knows its packages.
+- **Windows and Linux x64** are the packaged platforms; macOS is untested.
 
 ## Ideas not yet built
 
