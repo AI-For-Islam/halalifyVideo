@@ -16,6 +16,22 @@ case "$(uname -s)" in
 esac
 target_dir=${CARGO_TARGET_DIR:-target}
 
+# The compiler records source paths in the binary (for panic messages). Map
+# the local cargo home and the checkout to neutral names, so a release
+# carries no user name or folder layout of the machine that built it.
+cargo_home=${CARGO_HOME:-$HOME/.cargo}
+project=$PWD
+if [ "$os" = windows ]; then
+    cargo_home=$(cygpath -w "$cargo_home")
+    project=$(cygpath -w "$project")
+fi
+flags=("--remap-path-prefix=$cargo_home=cargo" "--remap-path-prefix=$project=halalify")
+# These flags replace .cargo/config.toml's, so the static C runtime is repeated.
+[ "$os" = windows ] && flags+=("-Ctarget-feature=+crt-static")
+# The encoded form (separated by 0x1f) keeps paths with spaces intact.
+CARGO_ENCODED_RUSTFLAGS=$(IFS=$'\x1f'; echo "${flags[*]}")
+export CARGO_ENCODED_RUSTFLAGS
+
 cargo build --release --locked
 
 name="halalify-$version-$os-x86_64"
