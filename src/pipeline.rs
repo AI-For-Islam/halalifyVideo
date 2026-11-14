@@ -62,6 +62,8 @@ pub fn run(args: &RunArgs) -> Result<()> {
         target: args.blur,
         shape: args.shape,
         threshold: args.threshold,
+        // "Nearby" evidence is what was seen within a second and a half.
+        window: info.video.as_ref().map_or(36, |v| (1.5 * v.fps.as_f64()).round() as u32),
         ..DecideConfig::default()
     };
     let mut blurred = false;
@@ -188,8 +190,22 @@ struct TrackReport {
     /// Probability that the person is a woman.
     female: Option<f32>,
     blurred: bool,
+    /// Sightings of this track that are blurred.
+    blurred_sightings: usize,
+    /// Mean detector confidence over the track.
+    mean_score: f32,
     /// Box at the middle sighting, `[x1, y1, x2, y2]` as fractions of the frame.
     typical_box: [f32; 4],
+    /// Every classifier sample: where the person was and what the model said.
+    evidence: Vec<SampleReport>,
+}
+
+#[derive(Serialize)]
+struct SampleReport {
+    frame: u32,
+    r#box: [f32; 4],
+    /// Log-odds of "woman" from this one sample.
+    logit: f32,
 }
 
 #[derive(Serialize)]
@@ -222,7 +238,14 @@ fn write_report(path: &Path, analysis: &Analysis, verdicts: &[Verdict], video: &
                 samples: verdict.samples,
                 female: verdict.female,
                 blurred: verdict.blur,
+                blurred_sightings: verdict.blur_at.iter().filter(|b| **b).count(),
+                mean_score: track.observations.iter().map(|o| o.score).sum::<f32>() / track.observations.len() as f32,
                 typical_box: track.observations[track.observations.len() / 2].bbox,
+                evidence: track
+                    .observations
+                    .iter()
+                    .filter_map(|o| Some(SampleReport { frame: o.frame, r#box: o.bbox, logit: o.female_logit? }))
+                    .collect(),
             })
         })
         .collect();
