@@ -53,6 +53,8 @@ pub struct Assembly<'a> {
     pub span: Span,
     /// CRF-like quality for re-encoded video.
     pub quality: u8,
+    /// Upper limit for re-encoded video, in bits per second.
+    pub max_bitrate: Option<u64>,
     pub output: &'a Path,
 }
 
@@ -71,7 +73,7 @@ impl Assembly<'_> {
             if self.span.is_whole() {
                 cmd.args(["-c:v", "copy"]);
             } else {
-                cmd.args(tools::encoder_args(&self.tools.encoder, self.quality)).args(["-pix_fmt", "yuv420p"]);
+                cmd.args(tools::encoder_args(&self.tools.encoder, self.quality, self.max_bitrate)).args(["-pix_fmt", "yuv420p"]);
             }
         }
         self.finish(&mut cmd, wav_index);
@@ -102,7 +104,7 @@ impl Assembly<'_> {
             .args(["-framerate", &video.fps.to_string(), "-i", "pipe:0"]);
         let wav_index = self.add_audio_input(&mut cmd, 2);
         cmd.args(["-filter_complex", &filter_graph(video, style), "-map", "[out]"])
-            .args(tools::encoder_args(&self.tools.encoder, self.quality));
+            .args(tools::encoder_args(&self.tools.encoder, self.quality, self.max_bitrate));
         self.finish(&mut cmd, wav_index);
 
         let mut child = cmd
@@ -226,6 +228,7 @@ mod tests {
             codec: "h264".into(),
             pix_fmt: "yuv420p".into(),
             variable_rate: false,
+            bit_rate: None,
         }
     }
 

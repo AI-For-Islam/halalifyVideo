@@ -42,7 +42,11 @@ impl Codec {
 
 /// Output-side ffmpeg arguments for `encoder` at a CRF-like `quality`
 /// (lower is better; 18 is near transparent, 23 is small).
-pub fn encoder_args(encoder: &str, quality: u8) -> Vec<String> {
+///
+/// `max_bitrate` caps the stream in bits per second. Constant-quality modes
+/// spend whatever a quality level costs, which for a source that was already
+/// compressed hard means a result several times its size for no visible gain.
+pub fn encoder_args(encoder: &str, quality: u8, max_bitrate: Option<u64>) -> Vec<String> {
     let q = quality.to_string();
     let mut a: Vec<&str> = vec!["-c:v", encoder];
     let owned: Vec<String>;
@@ -65,6 +69,12 @@ pub fn encoder_args(encoder: &str, quality: u8) -> Vec<String> {
         a.extend(["-preset", "8", "-crf", &owned[0]]);
     }
     let mut out: Vec<String> = a.into_iter().map(String::from).collect();
+    // Hardware encoders other than NVENC ignore or reject a cap in their
+    // quality modes, so it is only passed where it is known to work.
+    let capped = encoder.ends_with("_nvenc") || matches!(encoder, "libx264" | "libx265");
+    if let Some(bits) = max_bitrate.filter(|_| capped) {
+        out.extend(["-maxrate".into(), bits.to_string(), "-bufsize".into(), (2 * bits).to_string()]);
+    }
     if encoder.starts_with("hevc") || encoder == "libx265" {
         out.extend(["-tag:v".into(), "hvc1".into()]);
     }
@@ -343,15 +353,25 @@ mod tests {
 
     #[test]
     fn nvenc_args_use_constant_quality() {
-        let a = encoder_args("h264_nvenc", 21);
+        let a = encoder_args("h264_nvenc", 21, None);
         assert!(a.windows(2).any(|w| w == ["-cq", "21"]));
         assert!(!a.contains(&"-tag:v".to_string()));
+        assert!(!a.contains(&"-maxrate".to_string()));
+    }
+
+    #[test]
+    fn bitrate_cap_is_passed_where_it_works() {
+        for enc in ["h264_nvenc", "libx264"] {
+            let a = encoder_args(enc, 21, Some(3_000_000));
+            assert!(a.windows(4).any(|w| w == ["-maxrate", "3000000", "-bufsize", "6000000"]), "{enc}");
+        }
+        assert!(!encoder_args("h264_qsv", 21, Some(3_000_000)).contains(&"-maxrate".to_string()));
     }
 
     #[test]
     fn hevc_is_tagged_for_apple_players() {
         for enc in ["hevc_nvenc", "libx265", "hevc_qsv"] {
-            let a = encoder_args(enc, 21);
+            let a = encoder_args(enc, 21, None);
             assert!(a.windows(2).any(|w| w == ["-tag:v", "hvc1"]), "{enc}");
         }
     }

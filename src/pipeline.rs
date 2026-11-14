@@ -63,6 +63,7 @@ pub fn run(args: &RunArgs) -> Result<()> {
         audio: &audio,
         span,
         quality: args.quality,
+        max_bitrate: info.video.as_ref().and_then(|v| v.bit_rate).map(bitrate_cap),
         output: &output,
     };
 
@@ -163,6 +164,16 @@ fn analyze(
     let analysis = vision::analyze(tools, rt, source, video, span, &cfg, |frames| progress::set_media(&bar, frames as f64 / fps))?;
     bar.finish_and_clear();
     Ok(analysis)
+}
+
+/// The most a re-encoded video may use, given the source's bit rate.
+///
+/// Half as much again as the source: enough headroom that a fast hardware
+/// encoder does not visibly degrade a source made by a slow, efficient one,
+/// while keeping the result close to the source's size. Never below 1 Mb/s,
+/// so that very low-rate sources still get a usable picture.
+fn bitrate_cap(source: u64) -> u64 {
+    (source + source / 2).max(1_000_000)
 }
 
 /// Detect on every frame up to 30 fps; above that every other frame is plenty
@@ -300,6 +311,12 @@ mod tests {
     fn default_output_sits_next_to_the_input() {
         assert_eq!(default_output(Path::new("clips/My Talk.mkv"), true), Path::new("clips/My Talk.halal.mp4"));
         assert_eq!(default_output(Path::new("song.mp3"), false), Path::new("song.halal.m4a"));
+    }
+
+    #[test]
+    fn re_encoded_video_stays_near_the_source_size() {
+        assert_eq!(bitrate_cap(2_000_000), 3_000_000);
+        assert_eq!(bitrate_cap(300_000), 1_000_000);
     }
 
     #[test]

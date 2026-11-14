@@ -43,6 +43,8 @@ pub struct VideoStream {
     pub pix_fmt: String,
     /// True when the container timestamps are not evenly spaced.
     pub variable_rate: bool,
+    /// Bits per second of the video stream, when the file says.
+    pub bit_rate: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -76,6 +78,7 @@ struct RawProbe {
 #[derive(Deserialize)]
 struct RawFormat {
     duration: Option<String>,
+    bit_rate: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -88,6 +91,7 @@ struct RawStream {
     r_frame_rate: Option<String>,
     avg_frame_rate: Option<String>,
     duration: Option<String>,
+    bit_rate: Option<String>,
     sample_rate: Option<String>,
     channels: Option<u32>,
     #[serde(default)]
@@ -166,6 +170,13 @@ fn parse(json: &str) -> Result<MediaInfo> {
                 s.r_frame_rate.as_deref().and_then(Rational::parse),
                 s.avg_frame_rate.as_deref().and_then(Rational::parse),
             );
+            let bits = |b: &Option<String>| b.as_deref().and_then(|b| b.parse::<u64>().ok()).filter(|b| *b > 0);
+            // Some containers only give a total; the soundtrack's share is taken off it.
+            let bit_rate = bits(&s.bit_rate).or_else(|| {
+                let total = bits(&raw.format.as_ref()?.bit_rate)?;
+                let audio = a.map_or(0, |a| bits(&a.bit_rate).unwrap_or(128_000));
+                Some(total.saturating_sub(audio)).filter(|b| *b > 0)
+            });
             Some(VideoStream {
                 width,
                 height,
@@ -173,6 +184,7 @@ fn parse(json: &str) -> Result<MediaInfo> {
                 codec: s.codec_name.clone().unwrap_or_default(),
                 pix_fmt: s.pix_fmt.clone().unwrap_or_default(),
                 variable_rate,
+                bit_rate,
             })
         }
     };
@@ -253,10 +265,22 @@ mod tests {
             {"codec_type":"audio","codec_name":"aac","sample_rate":"48000","channels":2}],
             "format":{"duration":"12.5"}}"#;
         let info = parse(json).unwrap();
-        let v = info.video.unwrap();
+        let v = info.video.clone().unwrap();
         assert_eq!((v.width, v.height), (1080, 1920));
         assert_eq!(info.audio.unwrap().sample_rate, 48000);
         assert_eq!(info.duration, 12.5);
+        assert_eq!(v.bit_rate, None);
+    }
+
+    #[test]
+    fn video_bit_rate_comes_from_the_stream_or_the_container() {
+        let own = r#"{"streams":[{"codec_type":"video","width":640,"height":360,"r_frame_rate":"25/1",
+            "avg_frame_rate":"25/1","bit_rate":"900000"}],"format":{"duration":"10","bit_rate":"1100000"}}"#;
+        assert_eq!(parse(own).unwrap().video.unwrap().bit_rate, Some(900_000));
+        let total_only = r#"{"streams":[{"codec_type":"video","width":640,"height":360,"r_frame_rate":"25/1",
+            "avg_frame_rate":"25/1"},{"codec_type":"audio","bit_rate":"100000","sample_rate":"44100","channels":2}],
+            "format":{"duration":"10","bit_rate":"1100000"}}"#;
+        assert_eq!(parse(total_only).unwrap().video.unwrap().bit_rate, Some(1_000_000));
     }
 
     #[test]
