@@ -7,11 +7,11 @@
 
 use anyhow::{Context, Result, ensure};
 use ort::{session::Session, value::Tensor};
-use rayon::prelude::*;
 
 use super::{
     ola::Stereo,
-    stft::{Bin, Stft},
+    spectral::{self, Layout},
+    stft::{Padding, Stft},
 };
 use crate::{models::Model, runtime::Runtime};
 
@@ -40,7 +40,7 @@ impl MdxNet {
     pub fn load(rt: &Runtime, model: &Model, spec: MdxSpec) -> Result<MdxNet> {
         let session = rt.session(&model.fetch()?)?;
         let input_name = session.inputs().first().context("model has no input")?.name().to_string();
-        let stft = Stft::new(spec.n_fft, spec.hop);
+        let stft = Stft::new(spec.n_fft, spec.hop, Padding::Reflect);
         ensure!(spec.dim_f <= stft.bins(), "dim_f exceeds the number of STFT bins");
         Ok(MdxNet { session, input_name, spec, stft })
     }
@@ -59,49 +59,27 @@ impl MdxNet {
     pub fn separate(&mut self, chunks: &[Stereo]) -> Result<Vec<Stereo>> {
         let MdxSpec { dim_f, dim_t, compensate, .. } = self.spec;
         let chunk = self.chunk_len();
-        let plane = dim_f * dim_t; // one real or imaginary plane
-        let batch = chunks.len();
         ensure!(chunks.iter().all(|c| c[0].len() == chunk && c[1].len() == chunk), "chunk has the wrong length");
+        // The model was trained with the three lowest bins zeroed.
+        let layout = Layout { bins: dim_f, frames: dim_t, first_bin: 3 };
 
-        // Forward STFT: each (chunk, channel) pair owns two adjacent planes.
-        let mut input = vec![0.0f32; batch * 4 * plane];
-        let stft = &self.stft;
-        input.par_chunks_mut(2 * plane).enumerate().for_each_init(
-            || stft.scratch(),
-            |scratch, (i, planes)| {
-                let (re, im) = planes.split_at_mut(plane);
-                stft.analyze(&chunks[i / 2][i % 2], scratch, |t, bins| {
-                    // The model was trained with the three lowest bins zeroed.
-                    for f in 3..dim_f {
-                        re[f * dim_t + t] = bins[f].re;
-                        im[f * dim_t + t] = bins[f].im;
-                    }
-                });
-            },
-        );
-
-        let shape = [batch as i64, 4, dim_f as i64, dim_t as i64];
+        // Left and right of a chunk are adjacent, so the planes of one chunk
+        // are exactly the model's four channels.
+        let signals: Vec<&[f32]> = chunks.iter().flat_map(|c| [c[0].as_slice(), c[1].as_slice()]).collect();
+        let input = spectral::to_planes(&self.stft, &signals, &layout);
+        let shape = [chunks.len() as i64, 4, dim_f as i64, dim_t as i64];
         let tensor = Tensor::from_array((shape, input))?;
         let outputs = self.session.run(ort::inputs![self.input_name.as_str() => tensor])?;
-        let (out_shape, out) = outputs[0].try_extract_tensor::<f32>()?;
-        ensure!(out.len() == batch * 4 * plane, "unexpected model output shape {out_shape:?}");
+        let (_, out) = outputs[0].try_extract_tensor::<f32>()?;
+        ensure!(out.len() == signals.len() * 2 * layout.plane(), "unexpected model output size");
 
-        // Inverse STFT; bins above dim_f were never modelled and stay silent.
-        let mut planes_out: Vec<Vec<f32>> = (0..batch * 2).map(|_| vec![0.0f32; chunk]).collect();
-        planes_out.par_iter_mut().enumerate().for_each_init(
-            || stft.scratch(),
-            |scratch, (i, signal)| {
-                let (re, im) = out[i * 2 * plane..(i + 1) * 2 * plane].split_at(plane);
-                stft.synthesize(signal, scratch, |t, bins| {
-                    for (f, bin) in bins.iter_mut().enumerate() {
-                        *bin = if f < dim_f { Bin::new(re[f * dim_t + t], im[f * dim_t + t]) } else { Bin::default() };
-                    }
-                });
-                signal.iter_mut().for_each(|x| *x *= compensate);
-            },
-        );
-
-        let mut it = planes_out.into_iter();
-        Ok((0..batch).map(|_| [it.next().unwrap(), it.next().unwrap()]).collect())
+        let mut waves = spectral::from_planes(&self.stft, out, signals.len(), &layout, chunk).into_iter();
+        Ok((0..chunks.len())
+            .map(|_| {
+                let mut pair = [waves.next().unwrap(), waves.next().unwrap()];
+                pair.iter_mut().flatten().for_each(|x| *x *= compensate);
+                pair
+            })
+            .collect())
     }
 }
