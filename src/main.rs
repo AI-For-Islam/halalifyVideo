@@ -8,6 +8,7 @@ mod progress;
 mod render;
 mod runtime;
 mod tools;
+mod vision;
 mod workdir;
 
 use std::{ffi::OsString, process::ExitCode};
