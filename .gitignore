@@ -14,3 +14,4 @@ __pycache__/
 *.webm
 *.wav
 *.log
+/dist
