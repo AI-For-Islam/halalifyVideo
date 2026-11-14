@@ -123,7 +123,8 @@ impl Runtime {
     /// Loads a model on the best available provider.
     pub fn session(&self, model: &Path) -> Result<Session> {
         let order: &[Device] = match self.settled.get().unwrap_or(self.requested) {
-            Device::Auto => &[Device::Cuda, Device::Dml, Device::Cpu],
+            Device::Auto if cfg!(windows) => &[Device::Cuda, Device::Dml, Device::Cpu],
+            Device::Auto => &[Device::Cuda, Device::Cpu],
             Device::Cuda => &[Device::Cuda],
             Device::Dml => &[Device::Dml],
             Device::Cpu => &[Device::Cpu],
@@ -151,18 +152,23 @@ impl Runtime {
                 .build()
                 .error_on_failure()])?,
             // DirectML requires sequential execution and no memory-pattern planning.
+            #[cfg(windows)]
             Device::Dml => builder
                 .with_parallel_execution(false)?
                 .with_memory_pattern(false)?
                 .with_execution_providers([ep::DirectML::default().build().error_on_failure()])?,
+            #[cfg(not(windows))]
+            Device::Dml => return Err(ort::Error::new("DirectML exists only on Windows")),
             Device::Cpu | Device::Auto => builder.with_intra_threads(physical_cores())?,
         };
         builder.commit_from_file(model)
     }
 }
 
+/// The first line of an error that says something (ONNX Runtime's messages
+/// sometimes start with a blank line).
 fn first_line(s: &str) -> &str {
-    s.lines().next().unwrap_or(s)
+    s.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or(s)
 }
 
 fn physical_cores() -> usize {
@@ -178,7 +184,9 @@ fn physical_cores() -> usize {
 /// than any fixed list knows) and the core libraries are loaded up front.
 fn expose_cuda() -> Option<PathBuf> {
     if !cfg!(windows) {
-        return None; // elsewhere the loader finds them through the usual library path
+        // On Linux the library path was arranged when the program started.
+        let dir = cuda_dir();
+        return dir.join("libcudart.so.12").exists().then_some(dir);
     }
     let mut dirs: Vec<PathBuf> = Vec::new();
     if let Some(d) = std::env::var_os("HALALIFY_CUDA_DIR") {
@@ -207,4 +215,51 @@ fn expose_cuda() -> Option<PathBuf> {
         ort::util::preload_dylib(dir.join(dll)).ok()?;
     }
     Some(cuda)
+}
+
+/// Variable that marks a process started by [`prepare_linux_library_path`].
+#[cfg(target_os = "linux")]
+const REEXEC_MARK: &str = "HALALIFY_LIBRARY_PATH_SET";
+
+/// Directories with the privately installed shared libraries, if any.
+fn private_library_dirs() -> Vec<PathBuf> {
+    [onnxruntime_dir(), cuda_dir()].into_iter().filter(|d| d.is_dir()).collect()
+}
+
+/// True when the private library folders are already on `LD_LIBRARY_PATH`
+/// (or there are none).
+pub fn linux_library_path_ready() -> bool {
+    let current: Vec<PathBuf> = std::env::var_os("LD_LIBRARY_PATH").iter().flat_map(std::env::split_paths).collect();
+    private_library_dirs().iter().all(|d| current.contains(d))
+}
+
+/// On Linux, restarts the program with the private ONNX Runtime and CUDA
+/// folders on `LD_LIBRARY_PATH`.
+///
+/// The CUDA provider and cuDNN load their libraries by name, and the Linux
+/// loader reads the search path only when a process starts, so setting it
+/// later has no effect. Called first thing in `main`; does nothing when the
+/// folders are already on the path, when there are none, or on other systems.
+pub fn prepare_linux_library_path() {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::process::CommandExt;
+        if std::env::var_os(REEXEC_MARK).is_some() || linux_library_path_ready() {
+            return;
+        }
+        let mut dirs = private_library_dirs();
+        dirs.extend(std::env::var_os("LD_LIBRARY_PATH").iter().flat_map(std::env::split_paths));
+        let (Ok(exe), Ok(joined)) = (std::env::current_exe(), std::env::join_paths(dirs)) else { return };
+        let mut args = std::env::args_os();
+        let argv0 = args.next().unwrap_or_else(|| exe.clone().into_os_string());
+        // `exec` only returns on failure, in which case the program simply
+        // carries on without the GPU libraries.
+        let error = std::process::Command::new(&exe)
+            .arg0(argv0)
+            .args(args)
+            .env("LD_LIBRARY_PATH", joined)
+            .env(REEXEC_MARK, "1")
+            .exec();
+        eprintln!("note: could not restart with the GPU libraries on the library path: {error}");
+    }
 }

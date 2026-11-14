@@ -22,6 +22,7 @@ use cli::{Cli, Command, ToolArgs};
 use tools::{ToolOverrides, Tools};
 
 fn main() -> ExitCode {
+    runtime::prepare_linux_library_path();
     match run(Cli::parse_from(args_with_default_command())) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
