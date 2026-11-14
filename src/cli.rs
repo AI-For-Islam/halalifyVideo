@@ -4,7 +4,12 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
 
-use crate::{runtime::Device, tools::Codec};
+use crate::{
+    render::Style,
+    runtime::Device,
+    tools::Codec,
+    vision::decide::{Shape, Target},
+};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -77,6 +82,18 @@ pub struct RunArgs {
     /// Where to write the result (default: next to the input, named <name>.halal.mp4).
     #[arg(short, long, value_name = "FILE")]
     pub output: Option<PathBuf>,
+    /// Who to blur.
+    #[arg(long, value_enum, default_value = "women")]
+    pub blur: Target,
+    /// Area covered for each blurred person.
+    #[arg(long, value_enum, default_value = "silhouette")]
+    pub shape: Shape,
+    /// How a blurred area looks.
+    #[arg(long, value_enum, default_value = "blur")]
+    pub style: Style,
+    /// Probability of "woman" from which a person is blurred (lower blurs more readily).
+    #[arg(long, default_value_t = 0.35, value_name = "0..1")]
+    pub threshold: f32,
     /// What to do with the soundtrack.
     #[arg(long, value_enum, default_value = "clean")]
     pub audio: AudioMode,
@@ -92,6 +109,12 @@ pub struct RunArgs {
     /// Video quality when re-encoding: lower is better and bigger (18 near-lossless, 28 small).
     #[arg(long, default_value_t = 21, value_parser = clap::value_parser!(u8).range(10..=40))]
     pub quality: u8,
+    /// Look for people on every n-th frame only (default: every frame up to 30 fps).
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..=16))]
+    pub stride: Option<u32>,
+    /// Write a JSON account of every person found and the decision taken.
+    #[arg(long, value_name = "FILE")]
+    pub report: Option<PathBuf>,
     /// Keep the temporary work files for inspection.
     #[arg(long)]
     pub keep_temp: bool,
