@@ -152,6 +152,11 @@ impl Tracker {
         self.live.clear();
     }
 
+    /// True when nobody is being followed.
+    pub fn is_idle(&self) -> bool {
+        self.live.is_empty()
+    }
+
     pub fn track(&self, id: usize) -> &Track {
         &self.tracks[id]
     }

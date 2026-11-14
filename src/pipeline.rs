@@ -179,14 +179,20 @@ fn summarise(analysis: &Analysis, verdicts: &[Verdict], plan: &BlurPlan, video: 
     let seconds = analysis.frames as f64 / video.fps.as_f64();
     let blurred = verdicts.iter().filter(|v| v.blur).count();
     eprintln!(
-        "people found: {} tracks in {} frames ({:.1}s, {:.0} fps, {:.1}x realtime); {} blurred across {} frames",
+        "people found: {} tracks in {} frames, {} blurred across {} frames",
         analysis.tracks.len(),
         analysis.frames,
+        blurred,
+        plan.blurred_frames(),
+    );
+    eprintln!(
+        "analysis: {:.1}s ({:.0} frames/s, {:.1}x realtime; detector {:.1}s, classifier {:.1}s for {} crops)",
         analysis.elapsed,
         analysis.frames as f64 / analysis.elapsed.max(1e-3),
         seconds / analysis.elapsed.max(1e-3),
-        blurred,
-        plan.blurred_frames(),
+        analysis.detect_seconds,
+        analysis.classify_seconds,
+        analysis.classified,
     );
 }
 
