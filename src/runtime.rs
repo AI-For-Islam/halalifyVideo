@@ -146,7 +146,10 @@ impl Runtime {
     fn try_session(&self, model: &Path, device: Device) -> ort::Result<Session> {
         let builder = Session::builder(&self.env)?.with_optimization_level(GraphOptimizationLevel::All)?;
         let mut builder = match device {
-            Device::Cuda => builder.with_execution_providers([ep::CUDA::default().build().error_on_failure()])?,
+            Device::Cuda => builder.with_execution_providers([ep::CUDA::default()
+                .with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
+                .build()
+                .error_on_failure()])?,
             // DirectML requires sequential execution and no memory-pattern planning.
             Device::Dml => builder
                 .with_parallel_execution(false)?
