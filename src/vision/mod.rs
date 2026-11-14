@@ -3,6 +3,7 @@
 
 pub mod classify;
 pub mod cuts;
+pub mod decide;
 pub mod detect;
 pub mod frames;
 pub mod mask;
