@@ -2,3 +2,4 @@
 //! who they are. Produces tracks; `decide` turns them into a blur plan.
 
 pub mod frames;
+pub mod mask;
