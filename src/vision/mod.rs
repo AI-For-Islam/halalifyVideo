@@ -4,3 +4,4 @@
 pub mod detect;
 pub mod frames;
 pub mod mask;
+pub mod track;
