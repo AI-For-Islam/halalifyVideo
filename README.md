@@ -22,10 +22,13 @@ Measured on an RTX 2000 Ada laptop GPU (8 GB) with a 12-minute 1920x800 film
 
 | Stage | Time | Speed |
 |---|---|---|
-| Remove music | 32 s | 23x real time |
-| Find, follow and classify people | 76 s | 9.7x real time (233 frames/s) |
-| Blur and encode | 43 s | 17x real time |
-| **Whole job** | **152 s** | **4.8x real time** |
+| Remove music (dialogue models) | 125 s | 6x real time |
+| Find, follow and classify people | 92 s | 8x real time (191 frames/s) |
+| Blur and encode | 59 s | 12x real time |
+| **Whole job** | **277 s** | **2.7x real time** |
+
+With `--music-model vocals` (the fast model alone) music removal takes 32 s
+and the whole job about 150 s.
 
 With `--stride 2` the analysis takes 49 s instead of 76 s. A video in which
 nobody is blurred skips the last stage: its picture is copied untouched.
@@ -91,6 +94,8 @@ halalify <video file or link> [options]
 | `--style blur\|pixelate\|black` | How a blurred area looks | `blur` |
 | `--threshold 0..1` | Probability of "woman" from which a person is blurred; lower blurs more readily | `0.35` |
 | `--audio clean\|keep\|mute` | Remove music, leave the soundtrack alone, or drop it | `clean` |
+| `--music-model auto\|dialogue\|vocals` | `dialogue`: MDX-Net then BandIt, keeps speech only. `vocals`: MDX-Net alone, keeps every voice (sung too), 3x faster | `auto` (dialogue if installed) |
+| `--keep-effects` | Keep sound effects as well as speech (BandIt alone) | off |
 | `--start S`, `--duration S` | Process only part of the video | whole video |
 | `--stride N` | Look for people on every N-th frame only (faster) | every frame up to 30 fps |
 | `--max-height PIXELS` | For links: tallest picture to download | `1080` |
@@ -110,8 +115,8 @@ halalify long.mp4 --stride 2                 faster analysis
 
 ## How it works
 
-1. **Music.** The soundtrack is split by MDX-Net into voice and everything
-   else; the voice is kept.
+1. **Music.** MDX-Net keeps the voices; BandIt Plus then keeps only the
+   speech, so music in stretches without dialogue becomes silence.
 2. **First pass.** ffmpeg decodes small frames. YOLO26-seg finds every person
    and their outline, a tracker follows each person, and SigLIP 2 compares a
    crop of each person with text descriptions of women and of men.
@@ -131,6 +136,7 @@ behind it.
 | [YOLO26s-seg](https://github.com/ultralytics/ultralytics) | People and outlines | 21 MB | AGPL-3.0 |
 | [SigLIP 2 B/16-256](https://huggingface.co/google/siglip2-base-patch16-256) image encoder | Who is a woman | 186 MB | Apache-2.0 |
 | [Kim Vocal 2](https://github.com/TRvlvr/model_repo/releases/tag/all_public_uvr_models) (MDX-Net) | Music removal | 67 MB | MIT |
+| [BandIt Plus](https://github.com/ZFTurbo/Music-Source-Separation-Training) (optional, converted locally) | Speech / music / effects | 98 MB | MIT repository; the original BandIt weights on Zenodo are CC BY-NC 4.0 |
 
 The models are downloaded by `setup`, not distributed with this code, and each
 keeps its own licence. Note that YOLO26's licence is AGPL-3.0.

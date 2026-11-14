@@ -162,6 +162,35 @@ the fastest pair that really works is used. Results are cached.
 | `src/render.rs` | The ffmpeg render pass |
 | `tools/` | One-time scripts: prompt embeddings, evaluation contact sheets |
 
+### The dialogue method: MDX-Net, then BandIt Plus
+
+BandIt Plus separates speech, music and effects. `tools/export_bandit.py`
+rebuilds it with real arithmetic only (no complex tensors, STFT outside the
+graph, the 64 overlapping band masks merged by one matrix) and loads the
+published weights unchanged; on a 6 s chunk the rebuild agrees with the
+original code to 140 dB. The Rust side (`src/audio/bandit.rs`) reproduces the
+STFT and overlap-add, and agrees with PyTorch on the same 40 s to 57 dB.
+
+Scored on English and Egyptian Arabic speech mixed with the film's music at
+two levels (higher is better for the first two columns, lower for the last):
+
+| Method | Music alone | Speech kept (SDR) | Music left under speech |
+|---|---|---|---|
+| MDX-Net alone | -19 to -28 dB | 12 to 16 dB | -9 to -15 dB |
+| BandIt alone | -98 dB | 11 to 13 dB | -4 to -12 dB |
+| MDX-Net then BandIt | -66 to -96 dB | 11 to 13 dB | -7 to -14 dB |
+
+MDX-Net suppresses music best under speech but leaves it audible where nobody
+speaks; BandIt silences those stretches completely. Chained, each covers the
+other's weakness, at the cost of slightly duller speech. The two models run
+on separate threads so they overlap.
+
+ONNX Runtime 1.21's half-precision GRU on CUDA gives wrong results for this
+model (15 dB agreement), so the export keeps the GRU layers in fp32 and the
+rest in fp16: 60 dB agreement and twice the speed of fp32. The CUDA memory
+arena grows only as requested, which keeps BandIt at about 5 GB for two
+stereo chunks per call.
+
 ## Known limits
 
 - **It can miss a woman.** The detector must find her first; people smaller
@@ -171,16 +200,15 @@ the fastest pair that really works is used. Results are cached.
 - **Outline versus box.** The default blur follows the person's outline, grown
   slightly. `--shape box` covers a rounded box instead and cannot leave
   anything out.
-- **The music model keeps all voices**, sung ones included, and can let loud
-  sound effects through.
+- **The vocal model alone keeps all voices**, sung ones included, and can let
+  loud sound effects through. The dialogue method keeps speech only, which
+  also removes non-musical sound such as applause.
 - **Variable-frame-rate sources** are converted to a constant rate.
 - **HDR** sources are written as 8-bit SDR without tone mapping.
 - **Windows x64** is the tested platform; `setup` only knows its packages.
 
 ## Ideas not yet built
 
-- BandIt (speech / music / effects) as a dialogue-specific audio model; it
-  needs a one-time export to ONNX.
 - Showing the classifier only the pixels inside a person's outline, so a
   neighbour in the crop cannot sway the verdict.
 - A TensorRT provider, roughly three times faster for the detector.
