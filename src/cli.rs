@@ -87,9 +87,10 @@ pub enum AudioMode {
 
 #[derive(Args, Debug, Clone)]
 pub struct RunArgs {
-    /// A video file.
+    /// A video file, or a link to a video (YouTube and whatever else yt-dlp supports).
     pub input: String,
-    /// Where to write the result (default: next to the input, named <name>.halal.mp4).
+    /// Where to write the result (default: <name>.halal.mp4 next to the input,
+    /// or in the current folder for a link).
     #[arg(short, long, value_name = "FILE")]
     pub output: Option<PathBuf>,
     /// Who to blur.
@@ -119,6 +120,9 @@ pub struct RunArgs {
     /// Video quality when re-encoding: lower is better and bigger (18 near-lossless, 28 small).
     #[arg(long, default_value_t = 21, value_parser = clap::value_parser!(u8).range(10..=40))]
     pub quality: u8,
+    /// For links: the tallest picture to download, in pixels.
+    #[arg(long, default_value_t = 1080, value_name = "PIXELS")]
+    pub max_height: u32,
     /// Look for people on every n-th frame only (default: every frame up to 30 fps).
     #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..=16))]
     pub stride: Option<u32>,

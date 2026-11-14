@@ -1,5 +1,6 @@
 mod audio;
 mod cli;
+mod fetch;
 mod models;
 mod paths;
 mod pipeline;

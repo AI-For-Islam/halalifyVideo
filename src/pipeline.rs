@@ -11,6 +11,7 @@ use serde::Serialize;
 use crate::{
     audio::{self, io::Span},
     cli::{AudioMode, RunArgs},
+    fetch,
     probe::{self, MediaInfo, VideoStream},
     progress,
     render::{Assembly, AudioTrack},
@@ -28,19 +29,30 @@ pub fn run(args: &RunArgs) -> Result<()> {
     let over = ToolOverrides { ffmpeg: args.tools.ffmpeg.clone(), encoder: args.tools.encoder.clone(), ytdlp: None };
     let tools = Tools::discover(args.tools.codec, &over)?;
 
-    let source = PathBuf::from(&args.input);
+    let work = WorkDir::create(args.keep_temp)?;
+    let from_link = fetch::is_url(&args.input);
+    let source = if from_link {
+        fetch::download(&tools, &args.input, work.path(), args.max_height)?
+    } else {
+        PathBuf::from(&args.input)
+    };
     if !source.is_file() {
         bail!("input file not found: {}", source.display());
     }
     let info = probe::probe(&tools, &source)?;
     let span = Span { start: args.start, duration: args.duration };
     let length = span.length(info.duration);
-    let output = args.output.clone().unwrap_or_else(|| default_output(&source, info.video.is_some()));
+    let output = match &args.output {
+        Some(path) => path.clone(),
+        // A downloaded source lives in the work folder, which is deleted:
+        // its result goes to the folder the program was started in.
+        None if from_link => PathBuf::from(default_output(&source, info.video.is_some()).file_name().unwrap_or_default()),
+        None => default_output(&source, info.video.is_some()),
+    };
     if same_file(&source, &output) {
         bail!("the output would overwrite the input; choose another name with -o");
     }
 
-    let work = WorkDir::create(args.keep_temp)?;
     let rt = Runtime::new(args.device)?;
 
     let audio = clean_audio(args, &tools, &rt, &source, &info, span, length, &work)?;
