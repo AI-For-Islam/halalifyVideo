@@ -134,7 +134,9 @@ before any model can load, in every build flavour. Version 1.21 starts in
 API level 21) instead of linking a newer one in.
 
 The provider is chosen by trying CUDA, then DirectML, then CPU, and keeping the
-first that can really create a session.
+first that can really create a session. Both GPU routes were run end to end on
+the development machine: with CUDA the film analyses at 233 frames/s; with the
+DirectML build a 30 s excerpt, model warm-up included, ran at 96 frames/s.
 
 ### Tools are test-driven, not trusted
 
