@@ -155,4 +155,21 @@ pub const SIGLIP2_VISION: Model = Model {
     about: "SigLIP 2 B/16-256 image encoder: zero-shot person classification",
 };
 
+/// BandIt Plus (speech / music / effects), the better music remover for
+/// film and broadcast audio. It is published as a PyTorch checkpoint only, so
+/// there is nothing to download here: `tools/export_bandit.py` converts the
+/// checkpoint once, and the result is used whenever it is present.
+pub const BANDIT_PLUS: Model = Model {
+    file: "bandit-plus-dnr.onnx",
+    url: "",
+    sha256: "",
+    bytes: 98_000_000,
+    license: "MIT repository (ZFTurbo Music-Source-Separation-Training)",
+    about: "BandIt Plus: speech / music / effects",
+};
+
+/// Models every installation needs; `setup` downloads them.
 pub const ALL: &[Model] = &[MDX_KIM_VOCAL_2, YOLO26S_SEG, SIGLIP2_VISION];
+
+/// Models that improve results when present but are not downloadable.
+pub const OPTIONAL: &[Model] = &[BANDIT_PLUS];

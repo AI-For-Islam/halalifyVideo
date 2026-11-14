@@ -9,7 +9,7 @@ use anyhow::{Context, Result, bail};
 use serde::Serialize;
 
 use crate::{
-    audio::{self, io::Span},
+    audio::{self, AudioOptions, io::Span},
     cli::{AudioMode, RunArgs},
     fetch,
     probe::{self, MediaInfo, VideoStream},
@@ -128,13 +128,15 @@ fn clean_audio(
         (AudioMode::Clean, Some(_)) => {
             let wav = work.file("voice.wav");
             let bar = progress::media_bar("removing music", length);
-            let report = audio::remove_music(tools, rt, source, &wav, span, |s| progress::set_media(&bar, s))?;
+            let options = AudioOptions { model: args.music_model, keep_effects: args.keep_effects };
+            let report = audio::remove_music(tools, rt, source, &wav, span, &options, |s| progress::set_media(&bar, s))?;
             bar.finish_and_clear();
             eprintln!(
-                "music removed: {:.0}s of audio in {:.1}s ({:.0}x realtime, {})",
+                "music removed: {:.0}s of audio in {:.1}s ({:.0}x realtime, {} on {})",
                 report.seconds,
                 report.elapsed,
                 report.seconds / report.elapsed.max(1e-3),
+                report.method,
                 device_name(rt)
             );
             AudioTrack::Clean(wav)

@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 use crate::{
+    audio::MusicModel,
     render::Style,
     runtime::Device,
     setup::Provider,
@@ -108,6 +109,12 @@ pub struct RunArgs {
     /// What to do with the soundtrack.
     #[arg(long, value_enum, default_value = "clean")]
     pub audio: AudioMode,
+    /// Which model removes the music.
+    #[arg(long, value_enum, default_value = "auto")]
+    pub music_model: MusicModel,
+    /// Keep sound effects as well as speech (dialogue model only).
+    #[arg(long)]
+    pub keep_effects: bool,
     /// Process only from this time, in seconds.
     #[arg(long, value_name = "SECONDS")]
     pub start: Option<f64>,

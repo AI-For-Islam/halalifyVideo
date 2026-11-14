@@ -130,6 +130,11 @@ fn doctor(args: &ToolArgs) -> Result<()> {
         println!("model        {:<44} {state}", m.file);
         println!("             {} [{}]", m.about, m.license);
     }
+    for m in models::OPTIONAL {
+        let state = if m.is_present() { "installed" } else { "not installed (optional; see the README)" };
+        println!("model        {:<44} {state}", m.file);
+        println!("             {} [{}]", m.about, m.license);
+    }
     if runtime::find_onnxruntime().is_some() {
         match runtime::Runtime::new(runtime::Device::Auto) {
             Ok(rt) => {
