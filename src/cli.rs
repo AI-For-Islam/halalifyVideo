@@ -20,6 +20,8 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
+    /// Clean a video (the default command: `halalify <INPUT>` works too).
+    Run(RunArgs),
     /// Show which tools, encoders, GPU providers and models this machine has.
     Doctor(ToolArgs),
     /// Print what ffprobe sees in a file, as HalalifyVid interprets it.
@@ -30,11 +32,11 @@ pub enum Command {
     },
     /// Download every model now instead of on first use.
     Models,
-    /// Time a model on random input (developer aid).
+    /// Time a model on constant input (developer aid).
     #[command(hide = true)]
     Bench {
         model: PathBuf,
-        /// Input shape, e.g. 1,3,384,384
+        /// Input shape, e.g. 1,3,384,640
         #[arg(long, value_delimiter = ',', required = true)]
         shape: Vec<usize>,
         #[arg(long, value_enum, default_value = "auto")]
@@ -56,4 +58,43 @@ pub struct ToolArgs {
     /// Output video codec.
     #[arg(long, value_enum, default_value = "h264")]
     pub codec: Codec,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum AudioMode {
+    /// Keep voices, remove music.
+    Clean,
+    /// Leave the soundtrack as it is.
+    Keep,
+    /// Drop the soundtrack.
+    Mute,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct RunArgs {
+    /// A video file.
+    pub input: String,
+    /// Where to write the result (default: next to the input, named <name>.halal.mp4).
+    #[arg(short, long, value_name = "FILE")]
+    pub output: Option<PathBuf>,
+    /// What to do with the soundtrack.
+    #[arg(long, value_enum, default_value = "clean")]
+    pub audio: AudioMode,
+    /// Process only from this time, in seconds.
+    #[arg(long, value_name = "SECONDS")]
+    pub start: Option<f64>,
+    /// Process only this many seconds.
+    #[arg(long, value_name = "SECONDS")]
+    pub duration: Option<f64>,
+    /// Where to run the models.
+    #[arg(long, value_enum, default_value = "auto")]
+    pub device: Device,
+    /// Video quality when re-encoding: lower is better and bigger (18 near-lossless, 28 small).
+    #[arg(long, default_value_t = 21, value_parser = clap::value_parser!(u8).range(10..=40))]
+    pub quality: u8,
+    /// Keep the temporary work files for inspection.
+    #[arg(long)]
+    pub keep_temp: bool,
+    #[command(flatten)]
+    pub tools: ToolArgs,
 }

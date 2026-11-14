@@ -2,20 +2,24 @@ mod audio;
 mod cli;
 mod models;
 mod paths;
+mod pipeline;
 mod probe;
+mod progress;
+mod render;
 mod runtime;
 mod tools;
+mod workdir;
 
-use std::process::ExitCode;
+use std::{ffi::OsString, process::ExitCode};
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
 use cli::{Cli, Command, ToolArgs};
 use tools::{ToolOverrides, Tools};
 
 fn main() -> ExitCode {
-    match run(Cli::parse()) {
+    match run(Cli::parse_from(args_with_default_command())) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("error: {e:#}");
@@ -24,8 +28,23 @@ fn main() -> ExitCode {
     }
 }
 
+/// `halalify video.mp4` means `halalify run video.mp4`: when the first
+/// argument is neither a command nor a flag, the `run` command is implied.
+fn args_with_default_command() -> Vec<OsString> {
+    let mut args: Vec<OsString> = std::env::args_os().collect();
+    let cli = Cli::command();
+    let is_command = |a: &str| a == "help" || cli.get_subcommands().any(|c| c.get_name() == a);
+    if let Some(first) = args.get(1).and_then(|a| a.to_str()) {
+        if !first.starts_with('-') && !is_command(first) {
+            args.insert(1, "run".into());
+        }
+    }
+    args
+}
+
 fn run(cli: Cli) -> Result<()> {
     match cli.command {
+        Command::Run(args) => pipeline::run(&args),
         Command::Doctor(t) => doctor(&t),
         Command::Probe { input, tools } => {
             let tools = discover(&tools)?;
