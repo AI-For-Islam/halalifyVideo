@@ -68,7 +68,9 @@ impl Model {
     }
 }
 
-fn download(url: &str, dest: &std::path::Path, expected: u64, label: &str) -> Result<()> {
+/// Downloads `url` to `dest` with a progress bar. `expected` is the size
+/// shown when the server does not report one.
+pub fn download(url: &str, dest: &std::path::Path, expected: u64, label: &str) -> Result<()> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(30)))
         .timeout_recv_response(Some(Duration::from_secs(60)))

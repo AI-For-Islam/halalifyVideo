@@ -7,6 +7,7 @@ mod probe;
 mod progress;
 mod render;
 mod runtime;
+mod setup;
 mod tools;
 mod vision;
 mod workdir;
@@ -47,6 +48,7 @@ fn run(cli: Cli) -> Result<()> {
     match cli.command {
         Command::Run(args) => pipeline::run(&args),
         Command::Doctor(t) => doctor(&t),
+        Command::Setup { provider, skip_models } => setup::run(provider, skip_models),
         Command::Probe { input, tools } => {
             let tools = discover(&tools)?;
             let info = probe::probe(&tools, &input)?;
@@ -101,22 +103,47 @@ fn discover(args: &ToolArgs) -> Result<Tools> {
 }
 
 fn doctor(args: &ToolArgs) -> Result<()> {
-    println!("home      {}", paths::home().display());
+    println!("home         {}", paths::home().display());
     match discover(args) {
         Ok(t) => {
-            println!("ffmpeg    {}", t.ffmpeg.display());
-            println!("ffprobe   {}", t.ffprobe.display());
-            println!("encoder   {}", t.encoder);
+            println!("ffmpeg       {}", t.ffmpeg.display());
+            println!("ffprobe      {}", t.ffprobe.display());
+            println!("encoder      {}", t.encoder);
             match &t.ytdlp {
-                Some(p) => println!("yt-dlp    {}", p.display()),
-                None => println!("yt-dlp    not found (only needed for links)"),
+                Some(p) => println!("yt-dlp       {}", p.display()),
+                None => println!("yt-dlp       not found (only needed for links)"),
             }
             match &t.js_runtime {
-                Some((name, p)) => println!("js        {name} ({})", p.display()),
-                None => println!("js        none (YouTube may offer fewer formats)"),
+                Some((name, p)) => println!("js runtime   {name} ({})", p.display()),
+                None => println!("js runtime   none (YouTube may offer fewer formats)"),
             }
         }
-        Err(e) => println!("tools     PROBLEM: {e:#}"),
+        Err(e) => println!("tools        PROBLEM: {e:#}"),
+    }
+    match runtime::find_onnxruntime() {
+        Some(p) => println!("onnxruntime  {}", p.display()),
+        None => println!("onnxruntime  not installed: run `halalify setup`"),
+    }
+    for m in models::ALL {
+        let state = if m.is_present() { "installed" } else { "missing (downloads on first use)" };
+        println!("model        {:<44} {state}", m.file);
+        println!("             {} [{}]", m.about, m.license);
+    }
+    if runtime::find_onnxruntime().is_some() {
+        match runtime::Runtime::new(runtime::Device::Auto) {
+            Ok(rt) => {
+                if let Some(dir) = rt.cuda_dir() {
+                    println!("cuda libs    {}", dir.display());
+                }
+                // Loading a model is the only real proof that a provider works.
+                match models::ALL.iter().find(|m| m.is_present()).map(|m| rt.session(&m.path())) {
+                    Some(Ok(_)) => println!("models run   on {}", rt.device().map_or("?".into(), |d| d.to_string())),
+                    Some(Err(e)) => println!("models run   PROBLEM: {e:#}"),
+                    None => println!("models run   unknown until a model is installed"),
+                }
+            }
+            Err(e) => println!("onnxruntime  PROBLEM: {e:#}"),
+        }
     }
     Ok(())
 }

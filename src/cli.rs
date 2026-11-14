@@ -7,6 +7,7 @@ use clap::{Args, Parser, Subcommand};
 use crate::{
     render::Style,
     runtime::Device,
+    setup::Provider,
     tools::Codec,
     vision::decide::{Shape, Target},
 };
@@ -34,6 +35,15 @@ pub enum Command {
         input: PathBuf,
         #[command(flatten)]
         tools: ToolArgs,
+    },
+    /// Install ONNX Runtime, the GPU libraries and the models (run once).
+    Setup {
+        /// GPU route (default: CUDA when an NVIDIA driver is present, else DirectML).
+        #[arg(long, value_enum)]
+        provider: Option<Provider>,
+        /// Leave the models to be downloaded on first use.
+        #[arg(long)]
+        skip_models: bool,
     },
     /// Download every model now instead of on first use.
     Models,
