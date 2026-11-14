@@ -38,11 +38,14 @@ pub struct DecideConfig {
     pub pad_frames: u32,
     /// Mask-grid cells the blurred area is grown by.
     pub grow: usize,
+    /// Half-width, in frames, of the window whose samples count as "nearby"
+    /// evidence for a moment of a track.
+    pub window: u32,
 }
 
 impl Default for DecideConfig {
     fn default() -> Self {
-        DecideConfig { target: Target::Women, shape: Shape::Silhouette, threshold: 0.35, pad_frames: 3, grow: 2 }
+        DecideConfig { target: Target::Women, shape: Shape::Silhouette, threshold: 0.35, pad_frames: 3, grow: 2, window: 36 }
     }
 }
 
@@ -55,34 +58,58 @@ const FULL_WEIGHT_HEIGHT: f32 = 0.25;
 /// A box is grown by this fraction of its size on every side before painting.
 const BOX_MARGIN: f32 = 0.04;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Verdict {
-    /// Probability that the person is a woman; `None` if never classified.
+    /// Probability that the person is a woman, from all samples of the track;
+    /// `None` if never classified.
     pub female: Option<f32>,
     pub samples: usize,
+    /// Whether any part of the track is blurred.
     pub blur: bool,
+    /// The decision for each observation of the track.
+    pub blur_at: Vec<bool>,
 }
 
-/// Weighs all classifier samples of a track and applies the blur policy.
+/// Weighs the classifier samples of a track and applies the blur policy to
+/// each of its observations.
+///
+/// Every moment is judged half on the whole track and half on the samples
+/// near it in time. For a track that really is one person the two agree. When
+/// the tracker has confused two people who crossed paths, so that one track
+/// is a man for a while and then a woman, the nearby evidence pulls each
+/// stretch towards the right answer instead of averaging the two away.
 pub fn judge(track: &Track, cfg: &DecideConfig) -> Verdict {
-    let (mut sum, mut weight, mut samples) = (0.0f32, 0.0f32, 0usize);
-    for o in &track.observations {
-        if let Some(logit) = o.female_logit {
-            let w = ((o.bbox[3] - o.bbox[1]) / FULL_WEIGHT_HEIGHT).clamp(0.2, 1.0);
-            sum += w * logit.clamp(-MAX_SAMPLE_LOGIT, MAX_SAMPLE_LOGIT);
-            weight += w;
-            samples += 1;
-        }
-    }
-    let female = (samples > 0).then(|| 1.0 / (1.0 + (-sum / weight).exp()));
-    let blur = match cfg.target {
+    // (frame, weight, clipped logit) of every classified observation
+    let samples: Vec<(u32, f32, f32)> = track
+        .observations
+        .iter()
+        .filter_map(|o| {
+            let weight = ((o.bbox[3] - o.bbox[1]) / FULL_WEIGHT_HEIGHT).clamp(0.2, 1.0);
+            Some((o.frame, weight, o.female_logit?.clamp(-MAX_SAMPLE_LOGIT, MAX_SAMPLE_LOGIT)))
+        })
+        .collect();
+    let mean = |items: &mut dyn Iterator<Item = &(u32, f32, f32)>| -> Option<f32> {
+        let (sum, weight) = items.fold((0.0, 0.0), |(s, w), &(_, wi, l)| (s + wi * l, w + wi));
+        (weight > 0.0).then(|| sum / weight)
+    };
+    let overall = mean(&mut samples.iter());
+    let probability = |logit: f32| 1.0 / (1.0 + (-logit).exp());
+    let wanted = |female: Option<f32>| match cfg.target {
         Target::Everyone => true,
         Target::Nobody => false,
         // Someone who could not be classified is blurred: the cautious choice.
         Target::Women => female.is_none_or(|p| p >= cfg.threshold),
         Target::Men => female.is_none_or(|p| p <= 1.0 - cfg.threshold),
     };
-    Verdict { female, samples, blur }
+    let blur_at: Vec<bool> = track
+        .observations
+        .iter()
+        .map(|o| {
+            let nearby = mean(&mut samples.iter().filter(|s| s.0.abs_diff(o.frame) <= cfg.window));
+            wanted(overall.map(|all| probability(0.5 * all + 0.5 * nearby.unwrap_or(all))))
+        })
+        .collect();
+    Verdict { female: overall.map(probability), samples: samples.len(), blur: blur_at.contains(&true), blur_at }
 }
 
 enum Region<'a> {
@@ -107,6 +134,7 @@ impl<'a> BlurPlan<'a> {
             if !verdict.blur {
                 continue;
             }
+            let chosen = |i: usize| verdict.blur_at.get(i).copied().unwrap_or(true);
             // The shot this track lives in: [shot_start, shot_end).
             let shot_start = cuts.iter().copied().filter(|&c| c <= first.frame).max().unwrap_or(0);
             let shot_end = cuts.iter().copied().filter(|&c| c > last.frame).min().unwrap_or(total_frames).min(total_frames);
@@ -124,11 +152,13 @@ impl<'a> BlurPlan<'a> {
             for (i, o) in obs.iter().enumerate() {
                 // Each outline also covers the neighbouring frames, which
                 // hides one-frame lapses of the outline and fast movement.
-                for f in o.frame as i64 - 1..=o.frame as i64 + 1 {
-                    put(f, region_of(o));
+                if chosen(i) {
+                    for f in o.frame as i64 - 1..=o.frame as i64 + 1 {
+                        put(f, region_of(o));
+                    }
                 }
                 // Frames between two sightings: move a box smoothly from one to the other.
-                if let Some(next) = obs.get(i + 1) {
+                if let Some(next) = obs.get(i + 1).filter(|_| chosen(i) || chosen(i + 1)) {
                     let span = (next.frame - o.frame) as f32;
                     for f in o.frame + 1..next.frame {
                         let t = (f - o.frame) as f32 / span;
@@ -139,8 +169,12 @@ impl<'a> BlurPlan<'a> {
                 }
             }
             for k in 2..=cfg.pad_frames as i64 {
-                put(first.frame as i64 - k, region_of(first));
-                put(last.frame as i64 + k, region_of(last));
+                if chosen(0) {
+                    put(first.frame as i64 - k, region_of(first));
+                }
+                if chosen(obs.len() - 1) {
+                    put(last.frame as i64 + k, region_of(last));
+                }
             }
         }
         BlurPlan { frames, grow: cfg.grow }
@@ -221,7 +255,7 @@ mod tests {
         let unsure = track(&[(0, 0.1, Some(-0.4))]);
         assert!(judge(&unsure, &cfg).blur);
         let unknown = track(&[(0, 0.1, None)]);
-        assert_eq!(judge(&unknown, &cfg), Verdict { female: None, samples: 0, blur: true });
+        assert_eq!(judge(&unknown, &cfg), Verdict { female: None, samples: 0, blur: true, blur_at: vec![true] });
     }
 
     #[test]
@@ -232,6 +266,20 @@ mod tests {
         assert!(judge(&woman, &with(Target::Women)).blur && !judge(&man, &with(Target::Women)).blur);
         assert!(!judge(&woman, &with(Target::Men)).blur && judge(&man, &with(Target::Men)).blur);
         assert!(judge(&man, &with(Target::Everyone)).blur && !judge(&woman, &with(Target::Nobody)).blur);
+    }
+
+    #[test]
+    fn a_track_that_switches_person_is_judged_stretch_by_stretch() {
+        // The tracker followed a man for 100 frames, then a woman who crossed him.
+        let mut samples: Vec<(u32, f32, Option<f32>)> = (0..100).map(|f| (f, 0.1, (f % 6 == 0).then_some(-3.5))).collect();
+        samples.extend((100..200).map(|f| (f, 0.1, (f % 6 == 0).then_some(3.5))));
+        let t = track(&samples);
+        let v = judge(&t, &DecideConfig::default());
+        assert!(v.blur);
+        assert!(v.blur_at[..60].iter().all(|b| !b), "the man is left alone");
+        assert!(v.blur_at[140..].iter().all(|b| *b), "the woman is blurred");
+        // Overall the evidence cancels out, which is exactly why it is not used alone.
+        assert!((v.female.unwrap() - 0.5).abs() < 0.1);
     }
 
     fn painted(plan: &BlurPlan, frame: u32) -> usize {
