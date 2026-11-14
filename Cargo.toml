@@ -11,17 +11,23 @@ anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
 dirs = "7.0.0"
 fast_image_resize = { version = "6.1.0", features = ["rayon"] }
+flate2 = { version = "1.1.11", default-features = false, features = ["zlib-rs"] }
 half = "2.7.1"
 indicatif = "0.18.6"
 ndarray = "0.17"
-ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "ndarray", "load-dynamic", "api-21", "half", "cuda", "directml"] }
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "ndarray", "load-dynamic", "api-21", "half", "cuda"] }
 rayon = "1.12.0"
 realfft = "3.5.1"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
+tar = { version = "0.4.46", default-features = false }
 ureq = "3"
 zip = { version = "9.5.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+# DirectML exists only on Windows.
+[target.'cfg(windows)'.dependencies]
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["directml"] }
 
 [profile.release]
 lto = "thin"
