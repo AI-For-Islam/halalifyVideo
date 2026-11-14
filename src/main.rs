@@ -1,5 +1,6 @@
 mod cli;
 mod paths;
+mod probe;
 mod tools;
 
 use std::process::ExitCode;
@@ -23,6 +24,12 @@ fn main() -> ExitCode {
 fn run(cli: Cli) -> Result<()> {
     match cli.command {
         Command::Doctor(t) => doctor(&t),
+        Command::Probe { input, tools } => {
+            let tools = discover(&tools)?;
+            let info = probe::probe(&tools, &input)?;
+            println!("{}", serde_json::to_string_pretty(&info)?);
+            Ok(())
+        }
     }
 }
 

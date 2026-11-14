@@ -22,6 +22,12 @@ pub struct Cli {
 pub enum Command {
     /// Show which tools, encoders, GPU providers and models this machine has.
     Doctor(ToolArgs),
+    /// Print what ffprobe sees in a file, as HalalifyVid interprets it.
+    Probe {
+        input: PathBuf,
+        #[command(flatten)]
+        tools: ToolArgs,
+    },
 }
 
 /// Options for locating external tools; shared by every command.
