@@ -1,4 +1,5 @@
 mod cli;
+mod models;
 mod paths;
 mod probe;
 mod tools;
@@ -28,6 +29,13 @@ fn run(cli: Cli) -> Result<()> {
             let tools = discover(&tools)?;
             let info = probe::probe(&tools, &input)?;
             println!("{}", serde_json::to_string_pretty(&info)?);
+            Ok(())
+        }
+        Command::Models => {
+            for m in models::ALL {
+                let path = m.fetch()?;
+                println!("{:<44} {}", m.file, models::sha256_file(&path)?);
+            }
             Ok(())
         }
     }

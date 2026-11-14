@@ -28,6 +28,8 @@ pub enum Command {
         #[command(flatten)]
         tools: ToolArgs,
     },
+    /// Download every model now instead of on first use.
+    Models,
 }
 
 /// Options for locating external tools; shared by every command.
