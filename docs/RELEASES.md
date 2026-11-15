@@ -141,8 +141,9 @@ launcher on an 8-second clip:
 | Linux | Fresh Debian 12 container with the GPU passed through (Docker on WSL 2) | `setup` detected the NVIDIA driver and installed the CUDA route; clip cleaned in 8.2 s on CUDA |
 | Linux | Same container, `--device cpu` | works; about 30x slower than CUDA |
 
-The GitHub Actions workflow has not run yet: this repository has no GitHub
-remote so far.
+The GitHub Actions workflow built, tested and published v0.1.0: the Linux
+archive on Debian 11 and the Windows archive on Windows Server 2022, with
+`cargo test` passing on both.
 
 macOS is not packaged: ONNX Runtime's CUDA and DirectML routes do not exist
 there, and it has not been tested.
