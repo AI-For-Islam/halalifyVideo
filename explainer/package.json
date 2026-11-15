@@ -1,0 +1,15 @@
+{
+  "name": "halalifyvid-explainer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A narrated three.js infographic video that explains how HalalifyVid works",
+  "type": "module",
+  "scripts": {
+    "narration": "python narration.py",
+    "serve": "python -m http.server 8765 --bind 127.0.0.1",
+    "render": "python render.py video --workers 6"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  }
+}
