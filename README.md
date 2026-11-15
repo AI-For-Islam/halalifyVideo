@@ -56,9 +56,12 @@ Ready-to-run archives for **Windows** and **Linux** (64-bit) are built by
 `scripts/package.sh` and published on the releases page once the repository
 is on GitHub. Unpack one, then:
 
-- **Windows:** drag a video onto `HalalifyVid.cmd`, or double-click it and
-  paste a file path or a YouTube link.
+- **Windows:** double-click `HalalifyVid.exe`, the desktop app: drop a video
+  on it or paste a YouTube link, choose who to blur, and press one button.
+  (`HalalifyVid.cmd` remains for those who prefer a console window.)
 - **Linux:** `./halalifyvid.sh video.mp4`
+
+![The HalalifyVid desktop app](docs/desktop-app.png)
 
 The first run installs the runtime and models into the folder's `data`
 directory. You also need ffmpeg (and yt-dlp for links).
@@ -119,6 +122,7 @@ halalify <video file or link> [options]
 | `--codec h264\|hevc\|av1` | Output video codec | `h264` |
 | `--device auto\|cuda\|dml\|cpu` | Where the models run | `auto` |
 | `--report FILE` | Write a JSON account of every person found and each decision | off |
+| `--progress bars\|json` | Progress bars, or one JSON object per line for a program that drives this one | `bars` |
 
 Examples:
 
@@ -164,6 +168,9 @@ cargo test --release
 ```
 
 runs the unit tests (they need no GPU, models or ffmpeg).
+
+The desktop app lives in [desktop/](desktop/README.md); it is a separate,
+small program that starts `halalify` and shows its progress.
 
 `tools/embed_prompts.py` rebuilds the text embeddings after the lists of
 descriptions are edited. `tools/eval/montage.py` turns a `--report` file into

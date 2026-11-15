@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HalalifyVid</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="wordmark">Halalify<b>Vid</b></span>
+      <span class="tagline" data-t="tagline"></span>
+    </div>
+    <div class="top-right">
+      <span class="chip" id="device-chip" hidden></span>
+      <button class="link" id="setup-link" type="button" data-t="openSetup" hidden></button>
+      <div class="segmented small" id="lang" role="group" aria-label="Language">
+        <button type="button" data-lang="en">English</button>
+        <button type="button" data-lang="ar">العربية</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Checking what is installed -->
+    <section class="view" id="view-loading">
+      <div class="center-note">
+        <div class="spinner"></div>
+        <p data-t="checking"></p>
+      </div>
+    </section>
+
+    <!-- The program itself is missing or cannot answer -->
+    <section class="view" id="view-broken" hidden>
+      <div class="card narrow">
+        <h1 data-t="brokenTitle"></h1>
+        <p class="muted" id="broken-text"></p>
+        <button class="primary" id="broken-retry" type="button" data-t="retry"></button>
+      </div>
+    </section>
+
+    <!-- One-time setup -->
+    <section class="view" id="view-setup" hidden>
+      <div class="card narrow">
+        <h1 data-t="setupTitle"></h1>
+        <p class="muted" data-t="setupText"></p>
+
+        <ul class="checklist" id="checklist"></ul>
+
+        <div id="tools-box" class="notice" hidden>
+          <p id="tools-text"></p>
+          <button class="secondary" id="tools-install" type="button" data-t="toolsInstall"></button>
+          <p class="hint" data-t="toolsHint"></p>
+        </div>
+
+        <fieldset class="field" id="route-field">
+          <legend data-t="routeLabel"></legend>
+          <label class="radio"><input type="radio" name="route" value="cuda"><span><b data-t="routeCuda"></b><small data-t="routeCudaNote"></small></span></label>
+          <label class="radio"><input type="radio" name="route" value="directml"><span><b data-t="routeDml"></b><small data-t="routeDmlNote"></small></span></label>
+          <label class="radio"><input type="radio" name="route" value="cpu"><span><b data-t="routeCpu"></b><small data-t="routeCpuNote"></small></span></label>
+        </fieldset>
+
+        <div class="progress-box" id="setup-progress" hidden>
+          <div class="row">
+            <span id="setup-now"></span>
+            <span class="num" id="setup-bytes"></span>
+          </div>
+          <div class="bar"><i id="setup-bar"></i></div>
+        </div>
+
+        <div class="actions">
+          <button class="primary" id="setup-start" type="button" data-t="setupStart"></button>
+          <button class="secondary" id="setup-cancel" type="button" data-t="stop" hidden></button>
+          <button class="link" id="setup-back" type="button" data-t="back" hidden></button>
+        </div>
+        <p class="error-text" id="setup-error" hidden></p>
+        <details class="log"><summary data-t="details"></summary><pre id="setup-log"></pre></details>
+      </div>
+    </section>
+
+    <!-- Home: choose a video and what to do with it -->
+    <section class="view" id="view-home" hidden>
+      <div class="drop" id="drop">
+        <div class="drop-inner" id="drop-empty">
+          <svg class="drop-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 32V10m0 0-9 9m9-9 9 9M8 34v4a2 2 0 0 0 2 2h28a2 2 0 0 0 2-2v-4" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <p class="drop-title" data-t="dropTitle"></p>
+          <div class="link-row">
+            <input type="text" id="link" spellcheck="false" autocomplete="off" data-t-placeholder="linkPlaceholder">
+            <button class="secondary" id="browse" type="button" data-t="browse"></button>
+          </div>
+        </div>
+        <div class="drop-inner chosen" id="drop-chosen" hidden>
+          <span class="kind" id="chosen-kind"></span>
+          <span class="chosen-name" id="chosen-name"></span>
+          <button class="link" id="chosen-clear" type="button" data-t="change"></button>
+        </div>
+      </div>
+
+      <div class="options">
+        <div class="option">
+          <h2 data-t="blurLabel"></h2>
+          <div class="segmented" data-option="blur">
+            <button type="button" data-value="women" data-t="blurWomen"></button>
+            <button type="button" data-value="men" data-t="blurMen"></button>
+            <button type="button" data-value="everyone" data-t="blurEveryone"></button>
+            <button type="button" data-value="nobody" data-t="blurNobody"></button>
+          </div>
+        </div>
+        <div class="option">
+          <h2 data-t="audioLabel"></h2>
+          <div class="segmented" data-option="audio">
+            <button type="button" data-value="clean" data-t="audioClean"></button>
+            <button type="button" data-value="keep" data-t="audioKeep"></button>
+            <button type="button" data-value="mute" data-t="audioMute"></button>
+          </div>
+        </div>
+        <div class="option" id="look-option">
+          <h2 data-t="styleLabel"></h2>
+          <div class="segmented" data-option="style">
+            <button type="button" data-value="blur" data-t="styleBlur"></button>
+            <button type="button" data-value="pixelate" data-t="stylePixelate"></button>
+            <button type="button" data-value="black" data-t="styleBlack"></button>
+          </div>
+        </div>
+        <div class="option" id="shape-option">
+          <h2 data-t="shapeLabel"></h2>
+          <div class="segmented" data-option="shape">
+            <button type="button" data-value="silhouette" data-t="shapeSilhouette"></button>
+            <button type="button" data-value="box" data-t="shapeBox"></button>
+          </div>
+        </div>
+      </div>
+
+      <details class="advanced">
+        <summary data-t="advanced"></summary>
+        <div class="advanced-grid">
+          <div class="field" id="threshold-field">
+            <label for="threshold"><span data-t="thresholdLabel"></span> <output id="threshold-out"></output></label>
+            <input type="range" id="threshold" min="0.10" max="0.90" step="0.05">
+            <div class="range-ends"><span data-t="thresholdLow"></span><span data-t="thresholdHigh"></span></div>
+          </div>
+          <div class="field" id="music-field">
+            <label data-t="musicLabel"></label>
+            <div class="segmented" data-option="musicModel">
+              <button type="button" data-value="auto" data-t="musicAuto"></button>
+              <button type="button" data-value="dialogue" data-t="musicDialogue"></button>
+              <button type="button" data-value="vocals" data-t="musicVocals"></button>
+            </div>
+            <p class="hint" id="music-hint"></p>
+          </div>
+          <div class="field">
+            <label class="check"><input type="checkbox" id="faster"><span><b data-t="fasterLabel"></b><small data-t="fasterNote"></small></span></label>
+          </div>
+          <div class="field">
+            <label data-t="saveLabel"></label>
+            <div class="save-row">
+              <span class="path" id="save-path"></span>
+              <button class="secondary" id="save-choose" type="button" data-t="chooseFolder"></button>
+              <button class="link" id="save-reset" type="button" data-t="reset" hidden></button>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <div class="go">
+        <button class="primary big" id="start" type="button" data-t="start" disabled></button>
+        <p class="hint" data-t="privacy"></p>
+      </div>
+    </section>
+
+    <!-- Working -->
+    <section class="view" id="view-work" hidden>
+      <div class="card">
+        <p class="eyebrow" data-t="working"></p>
+        <h1 class="job-name" id="work-name"></h1>
+        <ol class="stages" id="stages"></ol>
+        <div class="work-foot">
+          <span class="muted num" id="work-clock"></span>
+          <button class="secondary" id="work-cancel" type="button" data-t="stop"></button>
+        </div>
+        <details class="log"><summary data-t="details"></summary><pre id="work-log"></pre></details>
+      </div>
+    </section>
+
+    <!-- Finished -->
+    <section class="view" id="view-done" hidden>
+      <div class="card narrow done">
+        <svg class="done-icon" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="3"/><path d="m14 25 7 7 13-15" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h1 data-t="doneTitle"></h1>
+        <p class="path" id="done-path"></p>
+        <p class="muted" id="done-time"></p>
+        <div class="actions">
+          <button class="primary" id="done-play" type="button" data-t="play"></button>
+          <button class="secondary" id="done-show" type="button" data-t="showFolder"></button>
+          <button class="link" id="done-again" type="button" data-t="another"></button>
+        </div>
+        <p class="notice soft" data-t="review"></p>
+      </div>
+    </section>
+
+    <!-- Failed -->
+    <section class="view" id="view-error" hidden>
+      <div class="card narrow">
+        <h1 data-t="errorTitle"></h1>
+        <p class="error-text" id="error-text"></p>
+        <p class="notice soft" id="error-hint" hidden></p>
+        <div class="actions">
+          <button class="primary" id="error-retry" type="button" data-t="tryAgain"></button>
+          <button class="link" id="error-back" type="button" data-t="back"></button>
+        </div>
+        <details class="log"><summary data-t="details"></summary><pre id="error-log"></pre></details>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="i18n.js"></script>
+  <script src="preview.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -18,6 +18,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test
         run: cargo test --release --locked
+      - name: Test the desktop app
+        run: cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml
       - name: Package
         shell: bash
         run: bash scripts/package.sh

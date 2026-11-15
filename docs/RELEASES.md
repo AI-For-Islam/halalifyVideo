@@ -2,7 +2,7 @@
 
 HalalifyVid is released as one archive per operating system. Each unpacks to a
 self-contained folder: the program, a launcher, this documentation and an empty
-`data` folder. On the first run the program installs ONNX Runtime, the GPU
+`data` folder. The Windows archive also holds the desktop app, `HalalifyVid.exe`. On the first run the program installs ONNX Runtime, the GPU
 libraries and the models into `data`, so the folder can be moved anywhere or
 deleted to uninstall.
 
@@ -31,12 +31,22 @@ fetches the exact runtime libraries it uses.
 ### Windows
 
 1. Unpack the zip anywhere, for example to `C:\HalalifyVid`.
-2. Drag a video onto **`HalalifyVid.cmd`**, or double-click it and paste a file
-   path or a YouTube link. The first run installs the runtime and models
-   (about 1.8 GB with an NVIDIA GPU, about 500 MB otherwise) and then cleans
-   the video.
-3. The result is written next to the original as `<name>.halal.mp4` (for a
-   link, in the release folder).
+2. Double-click **`HalalifyVid.exe`**. The first time, it shows what is missing
+   and installs the runtime and models with one button (about 1.8 GB with an
+   NVIDIA GPU, about 500 MB otherwise). If ffmpeg or yt-dlp is missing it
+   offers to install them with winget.
+3. Drop a video on the window or paste a link, choose who to blur and what to
+   do with the sound, and press **Clean this video**.
+4. The result is written next to the original as `<name>.halal.mp4`; for a
+   link, into `Videos\HalalifyVid`. Another folder can be chosen under
+   *More options*.
+
+The app needs the WebView2 runtime, which Windows 11 includes and Windows 10
+receives with Microsoft Edge. Keep `HalalifyVid.exe` and `halalify.exe` in the
+same folder: the app does its work by running the program.
+
+Without the app, drag a video onto **`HalalifyVid.cmd`**, or double-click it and
+paste a file path or a link. Its results for links go to the release folder.
 
 From a terminal, `halalify.exe` takes every option:
 

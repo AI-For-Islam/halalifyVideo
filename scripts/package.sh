@@ -4,7 +4,8 @@
 #   Linux:               dist/halalify-<version>-linux-x86_64.tar.gz
 # Each archive unpacks to a self-contained folder with the program, a
 # launcher, the documentation and an empty "data" folder that the program
-# installs its runtime and models into.
+# installs its runtime and models into. The Windows archive also carries the
+# desktop app, HalalifyVid.exe (see desktop/).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,6 +34,9 @@ CARGO_ENCODED_RUSTFLAGS=$(IFS=$'\x1f'; echo "${flags[*]}")
 export CARGO_ENCODED_RUSTFLAGS
 
 cargo build --release --locked
+if [ "$os" = windows ]; then
+    cargo build --release --locked --manifest-path desktop/src-tauri/Cargo.toml
+fi
 
 name="halalify-$version-$os-x86_64"
 stage="dist/$name"
@@ -40,6 +44,9 @@ rm -rf "$stage"
 mkdir -p "$stage/data" "$stage/docs"
 cp "$target_dir/release/$exe" "$stage/"
 cp "packaging/$launcher" "$stage/"
+if [ "$os" = windows ]; then
+    cp "${CARGO_TARGET_DIR:-desktop/src-tauri/target}/release/HalalifyVid.exe" "$stage/"
+fi
 cp README.md LICENSE "$stage/"
 cp docs/DESIGN.md docs/RELEASES.md "$stage/docs/"
 cp packaging/data-README.txt "$stage/data/README.txt"
