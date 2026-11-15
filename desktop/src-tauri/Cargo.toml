@@ -1,0 +1,36 @@
+[package]
+name = "halalifyvid-desktop"
+version = "0.1.0"
+edition = "2024"
+description = "The HalalifyVid window: paste a link or pick a video, and the halalify program does the work"
+license = "MIT"
+rust-version = "1.92"
+
+# Kept out of the workspace of the command-line program, so that program's
+# Cargo.lock and build are untouched by the window's dependencies.
+[workspace]
+
+[[bin]]
+name = "HalalifyVid"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+
+[features]
+# A plain `cargo build` then serves the screens from inside the program, as a
+# release must; `cargo tauri dev` turns this off to reload them from disk.
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+lto = "thin"
+strip = true
+opt-level = "s"

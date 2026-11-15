@@ -6,6 +6,7 @@ use clap::{Args, Parser, Subcommand};
 
 use crate::{
     audio::MusicModel,
+    progress,
     render::Style,
     runtime::Device,
     setup::Provider,
@@ -21,6 +22,10 @@ use crate::{
     after_help = "Examples:\n  halalify lecture.mp4\n  halalify https://youtu.be/VIDEO_ID -o clean.mp4\n  halalify doctor"
 )]
 pub struct Cli {
+    /// How progress is reported: bars for a terminal, or one JSON object per
+    /// line on standard output for a program that drives this one.
+    #[arg(long, value_enum, global = true, default_value = "bars", value_name = "MODE")]
+    pub progress: progress::Mode,
     #[command(subcommand)]
     pub command: Command,
 }
@@ -48,6 +53,9 @@ pub enum Command {
     },
     /// Download every model now instead of on first use.
     Models,
+    /// Install the newest yt-dlp into the program's own folder. Links stop
+    /// working when yt-dlp falls behind the sites it reads.
+    UpdateYtdlp,
     /// Time a model on constant input (developer aid).
     #[command(hide = true)]
     Bench {

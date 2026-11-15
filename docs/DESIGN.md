@@ -160,6 +160,8 @@ the fastest pair that really works is used. Results are cached.
 | `src/vision/classify.rs` | Zero-shot person classifier |
 | `src/vision/decide.rs`, `mask.rs` | Verdicts, blur plan, mask painting |
 | `src/render.rs` | The ffmpeg render pass |
+| `src/progress.rs` | Progress bars, and the JSON events for a driving program |
+| `desktop/` | The desktop app: a window that runs this program |
 | `tools/` | One-time scripts: prompt embeddings, evaluation contact sheets |
 
 ### The dialogue method: MDX-Net, then BandIt Plus
@@ -191,6 +193,51 @@ rest in fp16: 60 dB agreement and twice the speed of fp32. The CUDA memory
 arena grows only as requested, which keeps BandIt at about 5 GB for two
 stereo chunks per call.
 
+## The desktop app
+
+The app in `desktop/` is a window and nothing more. It starts `halalify` as a
+child process and draws what the program reports; no model, no ffmpeg call and
+no decision lives in the app. Three things follow from that:
+
+- **One engine.** The command line and the app cannot drift apart, and
+  everything the app does can be reproduced in a terminal.
+- **A crash stays a message.** If ONNX Runtime or a GPU driver brings the
+  process down, the window is still there to say so.
+- **Stopping is ending a process.** The app ends `halalify` together with the
+  ffmpeg and yt-dlp processes it started, then removes the job's scratch
+  folder, which the program reported when it created it.
+
+The program's side of this is `--progress json`: instead of drawing bars it
+writes one JSON object per line to standard output.
+
+| Event | Meaning |
+|---|---|
+| `stage` | `done` of `total` seconds of media are through `removing music`, `finding people` or `blurring` |
+| `download` | bytes of a model or runtime package fetched so far |
+| `fetch` | a line of yt-dlp's progress while a link is downloaded |
+| `work` | the job's scratch folder |
+| `installed`, `ready` | `setup` has a package in place; `setup` is finished and the models run on `device` |
+| `done` | the job wrote `output` in `seconds` |
+| `error` | the command failed, with the message |
+
+`halalify doctor --progress json` prints a single `status` object: the tools
+found, the models present, and whether a video can be cleaned right now.
+Position events are limited to one per 120 ms, and every other line the
+program prints stays plain text, which the app keeps as its details log.
+
+**yt-dlp is the one thing that is not pinned.** Sites change, and a yt-dlp a
+few months old is refused by YouTube. `halalify update-ytdlp` therefore
+fetches the newest release into the program's own `bin` folder (searched
+first), checked against the checksum list published with that release. The
+app offers it as a button when a link could not be downloaded, and then
+tries the video again.
+
+The window is built with Tauri: the screens are plain HTML, CSS and
+JavaScript shown by the system's WebView2, so the app adds about 6 MB. Each
+choice made on screen is checked against the words `halalify` accepts before
+it becomes an argument, and the input is passed after `--`, so nothing typed
+or dropped can turn into an option.
+
 ## Known limits
 
 - **It can miss a woman.** The detector must find her first; people smaller
@@ -206,6 +253,7 @@ stereo chunks per call.
 - **Variable-frame-rate sources** are converted to a constant rate.
 - **HDR** sources are written as 8-bit SDR without tone mapping.
 - **Windows and Linux x64** are the packaged platforms; macOS is untested.
+- **The desktop app is built for Windows only** so far.
 
 ## Ideas not yet built
 

@@ -23,10 +23,13 @@ use tools::{ToolOverrides, Tools};
 
 fn main() -> ExitCode {
     runtime::prepare_linux_library_path();
-    match run(Cli::parse_from(args_with_default_command())) {
+    let cli = Cli::parse_from(args_with_default_command());
+    progress::set_mode(cli.progress);
+    match run(cli) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("error: {e:#}");
+            progress::emit(&progress::Event::Error { message: &format!("{e:#}") });
             ExitCode::FAILURE
         }
     }
@@ -49,8 +52,10 @@ fn args_with_default_command() -> Vec<OsString> {
 fn run(cli: Cli) -> Result<()> {
     match cli.command {
         Command::Run(args) => pipeline::run(&args),
+        Command::Doctor(t) if progress::json() => status(&t),
         Command::Doctor(t) => doctor(&t),
         Command::Setup { provider, skip_models } => setup::run(provider, skip_models),
+        Command::UpdateYtdlp => setup::update_ytdlp(),
         Command::Probe { input, tools } => {
             let tools = discover(&tools)?;
             let info = probe::probe(&tools, &input)?;
@@ -102,6 +107,73 @@ fn bench(model: &std::path::Path, shape: &[usize], device: runtime::Device, runs
 fn discover(args: &ToolArgs) -> Result<Tools> {
     let over = ToolOverrides { ffmpeg: args.ffmpeg.clone(), encoder: args.encoder.clone(), ytdlp: None };
     Tools::discover(args.codec, &over)
+}
+
+/// What `doctor` reports to a driving program: one JSON object.
+#[derive(serde::Serialize)]
+struct Status {
+    event: &'static str,
+    version: &'static str,
+    home: String,
+    ffmpeg: Option<String>,
+    ffprobe: Option<String>,
+    encoder: Option<String>,
+    ytdlp: Option<String>,
+    js_runtime: Option<String>,
+    /// Why ffmpeg cannot be used, when it cannot.
+    tools_problem: Option<String>,
+    onnxruntime: Option<String>,
+    /// The GPU route `setup` would choose on this machine.
+    provider: setup::Provider,
+    models: Vec<ModelStatus>,
+    /// Whether a video can be cleaned right now.
+    ready: bool,
+}
+
+#[derive(serde::Serialize)]
+struct ModelStatus {
+    file: &'static str,
+    installed: bool,
+    optional: bool,
+    bytes: u64,
+    about: &'static str,
+    license: &'static str,
+}
+
+/// `doctor` for a program: what is installed, without loading a model (which
+/// takes seconds; `setup` proves that the models run).
+fn status(args: &ToolArgs) -> Result<()> {
+    let show = |p: &std::path::Path| p.display().to_string();
+    let tools = discover(args);
+    let onnxruntime = runtime::find_onnxruntime();
+    let model = |m: &models::Model, optional| ModelStatus {
+        file: m.file,
+        installed: m.is_present(),
+        optional,
+        bytes: m.bytes,
+        about: m.about,
+        license: m.license,
+    };
+    let models: Vec<ModelStatus> =
+        models::ALL.iter().map(|m| model(m, false)).chain(models::OPTIONAL.iter().map(|m| model(m, true))).collect();
+    let ready = tools.is_ok() && onnxruntime.is_some() && models.iter().all(|m| m.installed || m.optional);
+    let t = tools.as_ref().ok();
+    progress::write_line(&Status {
+        event: "status",
+        version: env!("CARGO_PKG_VERSION"),
+        home: show(&paths::home()),
+        ffmpeg: t.map(|t| show(&t.ffmpeg)),
+        ffprobe: t.map(|t| show(&t.ffprobe)),
+        encoder: t.map(|t| t.encoder.to_string()),
+        ytdlp: t.and_then(|t| t.ytdlp.as_deref().map(show)),
+        js_runtime: t.and_then(|t| t.js_runtime.as_ref().map(|(name, _)| name.to_string())),
+        tools_problem: tools.as_ref().err().map(|e| format!("{e:#}")),
+        onnxruntime: onnxruntime.as_deref().map(show),
+        provider: setup::detect_provider(),
+        models,
+        ready,
+    });
+    Ok(())
 }
 
 fn doctor(args: &ToolArgs) -> Result<()> {

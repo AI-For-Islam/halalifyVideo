@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     models, paths,
+    progress::{self, Event},
     runtime::{self, Device, Runtime},
 };
 
@@ -289,27 +290,32 @@ pub fn run(provider: Option<Provider>, skip_models: bool) -> Result<()> {
             let present = model.is_present();
             model.fetch()?;
             println!("{:<28} {}", if present { "already installed" } else { "installed" }, model.file);
+            progress::emit(&Event::Installed { name: model.file });
         }
     }
 
     // Prove the installation works by loading a model.
     if cfg!(target_os = "linux") && provider == Provider::Cuda && !runtime::linux_library_path_ready() {
         println!("ready: installed. The CUDA libraries take effect the next time halalify starts.");
+        progress::emit(&Event::Ready { device: None });
         return Ok(());
     }
     let rt = Runtime::new(Device::Auto)?;
     if let Some(model) = models::ALL.iter().find(|m| m.is_present()) {
         rt.session(&model.path())?;
-        println!("ready: models run on {}", rt.device().map_or("?".into(), |d| d.to_string()));
+        let device = rt.device().map(|d| d.to_string());
+        println!("ready: models run on {}", device.as_deref().unwrap_or("?"));
+        progress::emit(&Event::Ready { device: device.as_deref() });
     } else {
         println!("ready: ONNX Runtime loads; models will download on first use");
+        progress::emit(&Event::Ready { device: None });
     }
     Ok(())
 }
 
 /// CUDA when an NVIDIA driver is installed; otherwise DirectML on Windows and
 /// the CPU elsewhere.
-fn detect_provider() -> Provider {
+pub fn detect_provider() -> Provider {
     if cfg!(windows) {
         let system = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
         if system.join("System32").join("nvcuda.dll").is_file() { Provider::Cuda } else { Provider::Directml }
@@ -324,9 +330,65 @@ fn detect_provider() -> Provider {
     }
 }
 
+/// Where yt-dlp publishes its newest release.
+const YTDLP_RELEASE: &str = "https://github.com/yt-dlp/yt-dlp/releases/latest/download";
+
+/// Installs the newest yt-dlp into the program's own `bin` folder, which is
+/// searched before anything else, so an older copy elsewhere stops mattering.
+///
+/// Unlike the runtime, yt-dlp cannot be pinned to a version: the sites it
+/// reads change, and only a recent release keeps working. The download is
+/// checked against the checksum list published with the same release, which
+/// catches a damaged download but, having the same origin, nothing more.
+pub fn update_ytdlp() -> Result<()> {
+    let (asset, name) = if cfg!(all(windows, target_arch = "x86_64")) {
+        ("yt-dlp.exe", "yt-dlp.exe")
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        ("yt-dlp_linux", "yt-dlp")
+    } else {
+        bail!("yt-dlp is only fetched for Windows and Linux x64; install it with your package manager")
+    };
+    let bin = paths::ensure(paths::bin_dir())?;
+    let downloads = paths::ensure(paths::cache_dir().join("downloads"))?;
+
+    let sums = downloads.join("yt-dlp.sums");
+    models::download(&format!("{YTDLP_RELEASE}/SHA2-256SUMS"), &sums, 2048, "yt-dlp checksums")
+        .context("downloading yt-dlp's checksum list")?;
+    let listed = std::fs::read_to_string(&sums).context("cannot read yt-dlp's checksum list")?;
+    let _ = std::fs::remove_file(&sums);
+    let expected = listed_checksum(&listed, asset).with_context(|| format!("yt-dlp's checksum list does not name {asset}"))?;
+
+    let file = downloads.join("yt-dlp.download");
+    models::download(&format!("{YTDLP_RELEASE}/{asset}"), &file, 24_000_000, "yt-dlp").context("downloading yt-dlp")?;
+    let got = models::sha256_file(&file)?;
+    if got != expected {
+        let _ = std::fs::remove_file(&file);
+        bail!("yt-dlp: checksum mismatch (expected {expected}, got {got}); the download was discarded");
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755))?;
+    }
+    let dest = bin.join(name);
+    std::fs::rename(&file, &dest).with_context(|| format!("cannot move yt-dlp to {}", dest.display()))?;
+    println!("{:<28} yt-dlp ({})", "installed", dest.display());
+    progress::emit(&Event::Installed { name: "yt-dlp" });
+    Ok(())
+}
+
+/// The SHA-256 that a `SHA2-256SUMS` list (`<hash>  <file>` per line) gives for `file`.
+fn listed_checksum(list: &str, file: &str) -> Option<String> {
+    list.lines().find_map(|line| {
+        let (hash, name) = line.split_once(char::is_whitespace)?;
+        (name.trim().trim_start_matches('*') == file && hash.len() == 64).then(|| hash.to_ascii_lowercase())
+    })
+}
+
 fn install(archive: &Archive, dir: &Path, manifest: &mut Manifest) -> Result<()> {
     if manifest.has(archive, dir) {
         println!("{:<28} {}", "already installed", archive.name);
+        progress::emit(&Event::Installed { name: archive.name });
         return Ok(());
     }
     paths::ensure(dir.to_path_buf())?;
@@ -349,6 +411,7 @@ fn install(archive: &Archive, dir: &Path, manifest: &mut Manifest) -> Result<()>
         bail!("{} did not contain the expected files", archive.name);
     }
     println!("{:<28} {} ({})", "installed", archive.name, files.join(", "));
+    progress::emit(&Event::Installed { name: archive.name });
     manifest.installed.insert(archive.name.to_string(), files);
     manifest.save()
 }
@@ -420,6 +483,17 @@ fn unpack_tar_gz(archive: &Path, dir: &Path, wanted: fn(&str) -> bool) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_checksum_is_read_from_the_published_list() {
+        let a = "a".repeat(64);
+        let b = "B".repeat(64);
+        let list = format!("{a}  yt-dlp\n{b}  yt-dlp.exe\n{a} *yt-dlp_linux\nnot-a-hash  yt-dlp.tar.gz\n");
+        assert_eq!(listed_checksum(&list, "yt-dlp.exe"), Some("b".repeat(64)));
+        assert_eq!(listed_checksum(&list, "yt-dlp_linux"), Some(a.clone()));
+        assert_eq!(listed_checksum(&list, "yt-dlp.tar.gz"), None);
+        assert_eq!(listed_checksum(&list, "yt-dlp_macos"), None);
+    }
 
     #[test]
     fn archive_filters_keep_only_the_needed_libraries() {
