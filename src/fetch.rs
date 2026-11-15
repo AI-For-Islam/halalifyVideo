@@ -10,7 +10,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use indicatif::{ProgressBar, ProgressStyle};
 
-use crate::tools::Tools;
+use crate::{progress, tools::Tools};
 
 /// yt-dlp prints the final file path on a line starting with this marker.
 const MARKER: &str = "HALALIFY_SAVED:";
@@ -60,7 +60,10 @@ pub fn download(tools: &Tools, url: &str, dir: &Path, max_height: u32) -> Result
     for line in BufReader::new(child.stdout.take().expect("stdout is piped")).lines().map_while(Result::ok) {
         match parse_line(&line) {
             Line::Saved(path) => saved = Some(path),
-            Line::Progress(text) => spinner.set_message(text),
+            Line::Progress(text) => {
+                progress::fetching(&text);
+                spinner.set_message(text);
+            }
             Line::Other => {}
         }
     }

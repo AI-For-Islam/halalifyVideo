@@ -30,6 +30,9 @@ pub fn run(args: &RunArgs) -> Result<()> {
     let tools = Tools::discover(args.tools.codec, &over)?;
 
     let work = WorkDir::create(args.keep_temp)?;
+    if !args.keep_temp {
+        progress::emit(&progress::Event::Work { dir: &work.path().to_string_lossy() });
+    }
     let from_link = fetch::is_url(&args.input);
     let source = if from_link {
         fetch::download(&tools, &args.input, work.path(), args.max_height)?
@@ -98,7 +101,7 @@ pub fn run(args: &RunArgs) -> Result<()> {
                 |frame, canvas| plan.paint(frame, canvas),
                 |frame| progress::set_media(&bar, frame as f64 / fps),
             )?;
-            bar.finish_and_clear();
+            progress::finish_media(&bar);
             blurred = true;
         }
     }
@@ -106,7 +109,11 @@ pub fn run(args: &RunArgs) -> Result<()> {
         assembly.without_blur()?;
     }
 
-    eprintln!("done in {:.1}s -> {}", started.elapsed().as_secs_f64(), output.display());
+    let seconds = started.elapsed().as_secs_f64();
+    eprintln!("done in {seconds:.1}s -> {}", output.display());
+    // A driving program is given the full path: the output may be relative.
+    let written = std::path::absolute(&output).unwrap_or_else(|_| output.clone());
+    progress::emit(&progress::Event::Done { output: &written.to_string_lossy(), seconds });
     if args.keep_temp {
         eprintln!("work files kept in {}", work.path().display());
     }
@@ -130,7 +137,7 @@ fn clean_audio(
             let bar = progress::media_bar("removing music", length);
             let options = AudioOptions { model: args.music_model, keep_effects: args.keep_effects };
             let report = audio::remove_music(tools, rt, source, &wav, span, &options, |s| progress::set_media(&bar, s))?;
-            bar.finish_and_clear();
+            progress::finish_media(&bar);
             eprintln!(
                 "music removed: {:.0}s of audio in {:.1}s ({:.0}x realtime, {} on {})",
                 report.seconds,
@@ -164,7 +171,7 @@ fn analyze(
     let bar = progress::media_bar("finding people", length);
     let fps = video.fps.as_f64();
     let analysis = vision::analyze(tools, rt, source, video, span, &cfg, |frames| progress::set_media(&bar, frames as f64 / fps))?;
-    bar.finish_and_clear();
+    progress::finish_media(&bar);
     Ok(analysis)
 }
 

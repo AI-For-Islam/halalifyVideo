@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     models, paths,
+    progress::{self, Event},
     runtime::{self, Device, Runtime},
 };
 
@@ -289,27 +290,32 @@ pub fn run(provider: Option<Provider>, skip_models: bool) -> Result<()> {
             let present = model.is_present();
             model.fetch()?;
             println!("{:<28} {}", if present { "already installed" } else { "installed" }, model.file);
+            progress::emit(&Event::Installed { name: model.file });
         }
     }
 
     // Prove the installation works by loading a model.
     if cfg!(target_os = "linux") && provider == Provider::Cuda && !runtime::linux_library_path_ready() {
         println!("ready: installed. The CUDA libraries take effect the next time halalify starts.");
+        progress::emit(&Event::Ready { device: None });
         return Ok(());
     }
     let rt = Runtime::new(Device::Auto)?;
     if let Some(model) = models::ALL.iter().find(|m| m.is_present()) {
         rt.session(&model.path())?;
-        println!("ready: models run on {}", rt.device().map_or("?".into(), |d| d.to_string()));
+        let device = rt.device().map(|d| d.to_string());
+        println!("ready: models run on {}", device.as_deref().unwrap_or("?"));
+        progress::emit(&Event::Ready { device: device.as_deref() });
     } else {
         println!("ready: ONNX Runtime loads; models will download on first use");
+        progress::emit(&Event::Ready { device: None });
     }
     Ok(())
 }
 
 /// CUDA when an NVIDIA driver is installed; otherwise DirectML on Windows and
 /// the CPU elsewhere.
-fn detect_provider() -> Provider {
+pub fn detect_provider() -> Provider {
     if cfg!(windows) {
         let system = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
         if system.join("System32").join("nvcuda.dll").is_file() { Provider::Cuda } else { Provider::Directml }
@@ -327,6 +333,7 @@ fn detect_provider() -> Provider {
 fn install(archive: &Archive, dir: &Path, manifest: &mut Manifest) -> Result<()> {
     if manifest.has(archive, dir) {
         println!("{:<28} {}", "already installed", archive.name);
+        progress::emit(&Event::Installed { name: archive.name });
         return Ok(());
     }
     paths::ensure(dir.to_path_buf())?;
@@ -349,6 +356,7 @@ fn install(archive: &Archive, dir: &Path, manifest: &mut Manifest) -> Result<()>
         bail!("{} did not contain the expected files", archive.name);
     }
     println!("{:<28} {} ({})", "installed", archive.name, files.join(", "));
+    progress::emit(&Event::Installed { name: archive.name });
     manifest.installed.insert(archive.name.to_string(), files);
     manifest.save()
 }

@@ -13,10 +13,9 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use indicatif::{ProgressBar, ProgressStyle};
 use sha2::{Digest, Sha256};
 
-use crate::paths;
+use crate::{paths, progress};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Model {
@@ -84,12 +83,7 @@ pub fn download(url: &str, dest: &std::path::Path, expected: u64, label: &str) -
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(expected);
 
-    let bar = ProgressBar::new(total).with_style(
-        ProgressStyle::with_template("{msg:>24} {bar:32.cyan/blue} {bytes:>10}/{total_bytes} {bytes_per_sec} eta {eta}")
-            .expect("valid template")
-            .progress_chars("=> "),
-    );
-    bar.set_message(label.to_string());
+    let bar = progress::download_bar(label, total);
 
     let mut reader = response.body_mut().as_reader();
     let mut file = File::create(dest)?;
@@ -100,10 +94,10 @@ pub fn download(url: &str, dest: &std::path::Path, expected: u64, label: &str) -
             break;
         }
         file.write_all(&buf[..n])?;
-        bar.inc(n as u64);
+        progress::add_download(&bar, n as u64);
     }
     file.flush()?;
-    bar.finish_and_clear();
+    progress::finish_download(&bar);
     Ok(())
 }
 
