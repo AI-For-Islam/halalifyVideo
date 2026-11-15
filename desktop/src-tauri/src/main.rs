@@ -127,6 +127,13 @@ fn install_tools(app: AppHandle, engine: State<'_, Engine>) -> Reply<()> {
     engine.start_winget(app.clone(), &["Gyan.FFmpeg", "yt-dlp.yt-dlp"])
 }
 
+/// Installs the newest yt-dlp into the program's own folder. Progress arrives
+/// as `engine` events.
+#[tauri::command]
+fn update_ytdlp(app: AppHandle, engine: State<'_, Engine>) -> Reply<()> {
+    engine.start(app.clone(), vec!["update-ytdlp".into(), "--progress".into(), "json".into()], None)
+}
+
 /// Stops whatever is running.
 #[tauri::command]
 fn cancel(engine: State<'_, Engine>) {
@@ -180,6 +187,7 @@ fn main() {
             start_run,
             start_setup,
             install_tools,
+            update_ytdlp,
             cancel,
             pick_video,
             pick_folder,

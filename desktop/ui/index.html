@@ -205,7 +205,15 @@
         <h1 data-t="errorTitle"></h1>
         <p class="error-text" id="error-text"></p>
         <p class="notice soft" id="error-hint" hidden></p>
-        <div class="actions">
+        <div class="progress-box" id="error-progress" hidden>
+          <div class="row">
+            <span data-t="ytdlpUpdating"></span>
+            <span class="num" id="error-bytes"></span>
+          </div>
+          <div class="bar"><i id="error-bar"></i></div>
+        </div>
+        <div class="actions" id="error-actions">
+          <button class="primary" id="error-update" type="button" data-t="ytdlpUpdate" hidden></button>
           <button class="primary" id="error-retry" type="button" data-t="tryAgain"></button>
           <button class="link" id="error-back" type="button" data-t="back"></button>
         </div>

@@ -26,6 +26,11 @@ Each archive comes with a `.sha256` file to check the download.
 No CUDA toolkit, Python or Visual C++ Redistributable is needed; the program
 fetches the exact runtime libraries it uses.
 
+yt-dlp ages quickly: when a link fails with "HTTP Error 403", run
+`halalify update-ytdlp` (the desktop app offers this as a button on the error
+screen). It puts the newest yt-dlp into the `data` folder, checked against
+the checksum list of its release.
+
 ## Install and run
 
 ### Windows

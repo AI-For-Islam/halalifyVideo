@@ -55,6 +55,7 @@ fn run(cli: Cli) -> Result<()> {
         Command::Doctor(t) if progress::json() => status(&t),
         Command::Doctor(t) => doctor(&t),
         Command::Setup { provider, skip_models } => setup::run(provider, skip_models),
+        Command::UpdateYtdlp => setup::update_ytdlp(),
         Command::Probe { input, tools } => {
             let tools = discover(&tools)?;
             let info = probe::probe(&tools, &input)?;

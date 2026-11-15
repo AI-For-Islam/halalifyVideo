@@ -90,6 +90,7 @@
     if (view === "home") drawHome();
     if (view === "work") drawWork();
     if (view === "done") drawDone();
+    if (view === "error") drawError();
   }
 
   function toast(text) {
@@ -217,6 +218,9 @@
     $("tools-box").hidden = !needsTools;
     $("tools-text").textContent = status.ffmpeg ? t("toolsLinks") : t("toolsMissing");
     $("tools-install").disabled = !!running;
+    // ffmpeg comes from winget; yt-dlp alone is fetched by the program itself.
+    $("tools-install").textContent = status.ffmpeg ? t("toolsInstallYtdlp") : t("toolsInstall");
+    $("tools-box").querySelector(".hint").textContent = status.ffmpeg ? t("toolsHintYtdlp") : t("toolsHint");
 
     const installed = !!status.onnxruntime && modelsOk;
     $("route-field").disabled = !!running;
@@ -257,7 +261,7 @@
     await begin({ kind: "setup", route: chosen ? chosen.value : "auto" }, "start_setup", { provider: chosen ? chosen.value : "auto" });
   });
 
-  $("tools-install").addEventListener("click", () => begin({ kind: "tools" }, "install_tools", {}));
+  $("tools-install").addEventListener("click", () => begin({ kind: "tools" }, status && status.ffmpeg ? "update_ytdlp" : "install_tools", {}));
   $("setup-cancel").addEventListener("click", () => backend.call("cancel"));
   $("setup-back").addEventListener("click", () => show("home"));
 
@@ -269,7 +273,7 @@
     try {
       await backend.call(command, args);
     } catch (e) {
-      const wasRun = job.kind === "run";
+      const wasRun = job.kind === "run" || job.kind === "ytdlp";
       job = null;
       if (wasRun) fail(String(e));
       else {
@@ -458,7 +462,7 @@
 
   backend.onEvent((e) => {
     if (!job) return;
-    const logTarget = job.kind === "run" ? "work-log" : "setup-log";
+    const logTarget = { run: "work-log", ytdlp: "error-log" }[job.kind] || "setup-log";
     switch (e.event) {
       case "log":
         appendLog(logTarget, e.text);
@@ -526,6 +530,13 @@
       }
       return;
     }
+    if (ended.kind === "ytdlp") {
+        // With a new yt-dlp in place the video is tried again at once.
+        await refresh();
+        if (exit.code === 0 && !exit.cancelled) startRun();
+        else fail(exit.cancelled ? t("stopped") : last.error || t("ytdlpFailed"));
+        return;
+    }
     // Setup or the tools: look again at what is installed.
     await refresh();
     if (!status) return;
@@ -566,13 +577,30 @@
   function fail(message) {
     $("error-text").textContent = message || t("errorUnknown");
     // A link that yt-dlp could not fetch: the usual cure is a newer yt-dlp.
-    const hint = $("error-hint");
-    hint.hidden = !/yt-dlp could not download/i.test(message || "");
-    hint.textContent = t("errorYtdlp");
+    ytdlpFailed = /yt-dlp could not download/i.test(message || "");
     $("error-log").textContent = last.log.join("\n");
     show("error");
   }
 
+  let ytdlpFailed = false;
+
+  function drawError() {
+    const updating = !!job && job.kind === "ytdlp";
+    $("error-hint").hidden = !ytdlpFailed;
+    $("error-hint").textContent = t("errorYtdlp");
+    $("error-update").hidden = !ytdlpFailed;
+    $("error-retry").className = ytdlpFailed ? "secondary" : "primary";
+    $("error-actions").hidden = updating;
+    $("error-progress").hidden = !updating;
+    if (updating) {
+      const d = job.download;
+      $("error-bytes").textContent = d && d.total ? `${megabytes(d.done)} / ${megabytes(d.total)}` : "";
+      $("error-bar").style.width = d && d.total ? (100 * d.done) / d.total + "%" : "0%";
+      $("error-bar").parentElement.classList.toggle("busy", !d);
+    }
+  }
+
+  $("error-update").addEventListener("click", () => begin({ kind: "ytdlp" }, "update_ytdlp", {}));
   $("error-retry").addEventListener("click", startRun);
   $("error-back").addEventListener("click", () => show("home"));
 

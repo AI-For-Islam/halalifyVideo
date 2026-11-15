@@ -53,6 +53,9 @@ pub enum Command {
     },
     /// Download every model now instead of on first use.
     Models,
+    /// Install the newest yt-dlp into the program's own folder. Links stop
+    /// working when yt-dlp falls behind the sites it reads.
+    UpdateYtdlp,
     /// Time a model on constant input (developer aid).
     #[command(hide = true)]
     Bench {

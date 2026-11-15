@@ -225,6 +225,13 @@ found, the models present, and whether a video can be cleaned right now.
 Position events are limited to one per 120 ms, and every other line the
 program prints stays plain text, which the app keeps as its details log.
 
+**yt-dlp is the one thing that is not pinned.** Sites change, and a yt-dlp a
+few months old is refused by YouTube. `halalify update-ytdlp` therefore
+fetches the newest release into the program's own `bin` folder (searched
+first), checked against the checksum list published with that release. The
+app offers it as a button when a link could not be downloaded, and then
+tries the video again.
+
 The window is built with Tauri: the screens are plain HTML, CSS and
 JavaScript shown by the system's WebView2, so the app adds about 6 MB. Each
 choice made on screen is checked against the words `halalify` accepts before

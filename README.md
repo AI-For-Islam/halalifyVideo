@@ -96,6 +96,14 @@ Check what was found at any time:
 halalify doctor
 ```
 
+Links stop working when yt-dlp falls behind the sites it reads (YouTube then
+answers "HTTP Error 403"). This installs the newest yt-dlp into the program's
+own folder, where it takes precedence over any older copy:
+
+```text
+halalify update-ytdlp
+```
+
 `halalify.cmd` in this folder runs the release build with `HALALIFY_HOME` set
 to `.halalify` here, which keeps the runtime and models beside the code.
 

@@ -107,7 +107,12 @@ window.TEXT = {
 
     errorTitle: "That did not work",
     errorUnknown: "The program stopped without saying why. The details below may help.",
-    errorYtdlp: "Sites change often, and an old yt-dlp is a common reason a link stops working. Update it (for example with: winget upgrade yt-dlp.yt-dlp), then try again.",
+    errorYtdlp: "Sites change often, and an old yt-dlp is a common reason a link stops working. The button below installs the newest one for HalalifyVid and tries the video again.",
+    ytdlpUpdate: "Update yt-dlp and try again",
+    ytdlpUpdating: "Downloading the newest yt-dlp…",
+    ytdlpFailed: "yt-dlp could not be updated. Check your connection and try again.",
+    toolsInstallYtdlp: "Install yt-dlp",
+    toolsHintYtdlp: "Downloads the newest yt-dlp from its GitHub releases into HalalifyVid's own folder.",
     tryAgain: "Try again",
 
     deviceChip: "Runs on {device}",
@@ -219,7 +224,12 @@ window.TEXT = {
 
     errorTitle: "لم ينجح ذلك",
     errorUnknown: "توقف البرنامج دون أن يذكر السبب. قد تفيدك التفاصيل أدناه.",
-    errorYtdlp: "المواقع تتغير كثيرًا، ومن الأسباب الشائعة لتعطّل الروابط أن يكون yt-dlp قديمًا. حدّثه (مثلًا بالأمر: winget upgrade yt-dlp.yt-dlp) ثم حاول مرة أخرى.",
+    errorYtdlp: "المواقع تتغير كثيرًا، ومن الأسباب الشائعة لتعطّل الروابط أن يكون yt-dlp قديمًا. الزر أدناه يثبّت أحدث إصدار منه لـ HalalifyVid ثم يعيد محاولة الفيديو.",
+    ytdlpUpdate: "حدّث yt-dlp وحاول مرة أخرى",
+    ytdlpUpdating: "جارٍ تنزيل أحدث إصدار من yt-dlp…",
+    ytdlpFailed: "تعذّر تحديث yt-dlp. تحقق من اتصالك ثم حاول مرة أخرى.",
+    toolsInstallYtdlp: "تثبيت yt-dlp",
+    toolsHintYtdlp: "ينزّل أحدث إصدار من yt-dlp من صفحة إصداراته على GitHub إلى مجلد HalalifyVid نفسه.",
     tryAgain: "حاول مرة أخرى",
 
     deviceChip: "يعمل على {device}",
